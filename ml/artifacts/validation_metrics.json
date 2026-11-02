@@ -1,0 +1,26 @@
+{
+  "MAE_units": 1.0554312865000612,
+  "RMSE_units": 2.1353393888854284,
+  "WAPE_percent": 73.15060335509337,
+  "sMAPE_percent": 139.01650098942977,
+  "R2": 0.6559825949337734,
+  "Bias_units_per_observation": -0.0057327102242432865,
+  "Bias_percent_of_total_demand": -0.39732687208271866,
+  "Forecast_Accuracy_custom_percent": 26.849396644906633,
+  "seasonal_naive": {
+    "MAE_units": 1.2447230942229301,
+    "RMSE_units": 2.6815128081654116,
+    "WAPE_percent": 86.27017837832572,
+    "sMAPE_percent": 82.50507585552079,
+    "R2": 0.4574917529317588,
+    "Bias_units_per_observation": -0.02146722578831467,
+    "Bias_percent_of_total_demand": -1.4878661821582706,
+    "Forecast_Accuracy_custom_percent": 13.729821621674276
+  },
+  "validation_days": [
+    "d_1914",
+    "d_1941"
+  ],
+  "n_series": 30490,
+  "best_iteration": 251
+}

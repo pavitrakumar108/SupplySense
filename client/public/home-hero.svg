@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="620" viewBox="0 0 900 620">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#f8eee0"/>
+      <stop offset="1" stop-color="#e8efe7"/>
+    </linearGradient>
+    <linearGradient id="sofa" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#d7a47f"/>
+      <stop offset="1" stop-color="#b9785d"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="620" rx="36" fill="url(#wall)"/>
+  <circle cx="710" cy="150" r="95" fill="#f3d9a9" opacity=".8"/>
+  <path d="M0 470h900v150H0z" fill="#d9c3a9"/>
+  <path d="M515 115h210v220H515z" fill="#f8f6ec" stroke="#fff" stroke-width="16"/>
+  <path d="M620 115v220M515 225h210" stroke="#c7d7c7" stroke-width="12"/>
+  <path d="M105 440h585a25 25 0 0 1 25 25v75H80v-75a25 25 0 0 1 25-25Z" fill="url(#sofa)"/>
+  <path d="M125 382h535a40 40 0 0 1 40 40v45H85v-45a40 40 0 0 1 40-40Z" fill="#e1b493"/>
+  <path d="M175 400v103M360 400v103M545 400v103" stroke="#c5896e" stroke-width="6" opacity=".7"/>
+  <path d="M80 505h640l-22 46H105z" fill="#825b47"/>
+  <rect x="295" y="520" width="225" height="20" rx="10" fill="#6e4d3e"/>
+  <path d="M324 540v48M492 540v48" stroke="#6e4d3e" stroke-width="13" stroke-linecap="round"/>
+  <path d="M745 360h80v112h-80z" fill="#f4ead8"/>
+  <path d="M785 360V185" stroke="#75896f" stroke-width="10"/>
+  <path d="M785 190c-70-2-88-46-88-94 50 0 91 19 88 94ZM790 260c67-7 92-47 93-91-49 4-87 30-93 91Z" fill="#829a79"/>
+  <path d="M750 348h70l-12-52h-46z" fill="#d09a70"/>
+  <path d="M155 370c-45-36-47-87-8-118 42 23 48 73 8 118ZM163 363c20-51 64-68 100-42-9 47-49 69-100 42Z" fill="#819777"/>
+  <path d="M160 372V280" stroke="#687e62" stroke-width="8"/>
+  <rect x="110" y="365" width="100" height="48" rx="12" fill="#c99a73"/>
+  <path d="M112 413h96l-10 48h-76z" fill="#aa7656"/>
+  <rect x="405" y="475" width="64" height="34" rx="17" fill="#f4ead8"/>
+  <path d="M437 475v-15" stroke="#8b6047" stroke-width="5"/>
+  <path d="M390 580h288" stroke="#b69579" stroke-width="5" stroke-linecap="round"/>
+</svg>

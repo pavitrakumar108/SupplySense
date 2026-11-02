@@ -1,0 +1,37 @@
+# Project Structure & File Manifest
+
+This document tracks the files and folders in the SupplySence project, their purpose, and their last update.
+
+## 📁 client/
+Frontend application built with React and Vite.
+
+| File/Folder | Purpose | Last Updated |
+| :--- | :--- | :--- |
+| `src/App.jsx` | Main application logic, routing, and UI components (Customer & Manager Portals) | 2026-10-23 |
+| `src/styles.css` | Global styles, layout, and theme definitions | 2026-10-23 |
+| `index.html` | Entry point for the frontend application | 2026-10-23 |
+| `vite.config.js` | Vite build and development configuration | 2026-10-23 |
+| `package.json` | Frontend dependencies and scripts | 2026-10-23 |
+
+## 📁 server/
+Backend API built with Node.js, Express, and Prisma.
+
+| File/Folder | Purpose | Last Updated |
+| :--- | :--- | :--- |
+| `src/server.js` | Server entry point and startup configuration | 2026-10-23 |
+| `src/app.js` | Express application setup and middleware configuration | 2026-10-23 |
+| `src/routes/` | API route definitions (auth, order, payment, warehouse, etc.) | 2026-10-23 |
+| `src/services/` | Business logic (payment processing, order management, demand prediction) | 2026-10-23 |
+| `src/middleware/` | Auth, validation, and error handling middleware | 2026-10-23 |
+| `src/config/` | Environment and logger configurations | 2026-10-23 |
+| `src/utils/` | Common utility functions (money formatting, response helpers) | 2026-10-23 |
+| `prisma/schema.prisma` | Database schema definition | 2026-10-23 |
+| `prisma/seed.js` | Database seeding script for initial data | 2026-10-23 |
+| `package.json` | Backend dependencies and scripts | 2026-10-23 |
+
+## 📁 docs/
+Project documentation and architecture references.
+
+| File/Folder | Purpose | Last Updated |
+| :--- | :--- | :--- |
+| `README.md` | General project overview | 2026-10-23 |

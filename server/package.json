@@ -1,0 +1,39 @@
+{
+  "name": "@supplysense/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "check": "node --check src/app.js && node --check src/server.js && node --check prisma/seed.js",
+    "test": "node --test test/*.test.js",
+    "db:generate": "DATABASE_URL=${DATABASE_URL:-postgresql://supplysense:supplysense@localhost:5433/supplysense?schema=public} prisma generate",
+    "db:migrate": "DATABASE_URL=${DATABASE_URL:-postgresql://supplysense:supplysense@localhost:5433/supplysense?schema=public} prisma migrate dev --name init",
+    "db:deploy": "DATABASE_URL=${DATABASE_URL:-postgresql://supplysense:supplysense@localhost:5433/supplysense?schema=public} prisma migrate deploy",
+    "db:status": "DATABASE_URL=${DATABASE_URL:-postgresql://supplysense:supplysense@localhost:5433/supplysense?schema=public} prisma migrate status",
+    "db:seed": "DATABASE_URL=${DATABASE_URL:-postgresql://supplysense:supplysense@localhost:5433/supplysense?schema=public} prisma db seed && DATABASE_URL=${DATABASE_URL:-postgresql://supplysense:supplysense@localhost:5433/supplysense?schema=public} node scripts/seed-demo-sales-history.js",
+    "db:seed-demo-sales": "node scripts/seed-demo-sales-history.js",
+    "db:validate": "DATABASE_URL=${DATABASE_URL:-postgresql://supplysense:supplysense@localhost:5433/supplysense?schema=public} prisma validate",
+    "db:refresh-product-options": "DATABASE_URL=${DATABASE_URL:-postgresql://supplysense:supplysense@localhost:5433/supplysense?schema=public} node scripts/refresh-product-options.js"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^10.6.0",
+    "@prisma/client": "^6.0.0",
+    "bcryptjs": "^3.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0",
+    "pino": "^9.6.0",
+    "pino-http": "^10.4.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "prisma": "^6.0.0"
+  }
+}

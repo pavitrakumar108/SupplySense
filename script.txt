@@ -1,0 +1,9 @@
+ % cd server      
+  npm install
+  npm run dev
+
+
+
+% cd /Users/johnwick/Desktop/SupplySense/client
+  npm install
+  npm run dev

@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: supplysense-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: supplysense
+      POSTGRES_USER: supplysense
+      POSTGRES_PASSWORD: supplysense
+    ports:
+      - "5432:5432"
+    volumes:
+      - supplysense-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supplysense -d supplysense"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: supplysense-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      CLIENT_URL: http://localhost:5173
+      DATABASE_URL: postgresql://supplysense:supplysense@postgres:5432/supplysense?schema=public
+      JWT_ACCESS_SECRET: local-docker-access-secret-change-before-nonlocal-use-123456
+      JWT_REFRESH_SECRET: local-docker-refresh-secret-change-before-nonlocal-use-123456
+      MOCK_PAYMENT_WEBHOOK_SECRET: local-docker-webhook-secret-change-before-nonlocal-use-123456
+      SEED_ADMIN_PASSWORD: ChangeMe!12345
+      SEED_CUSTOMER_PASSWORD: Customer!12345
+      SEED_MANAGER_PASSWORD: Manager!12345
+      SEED_AUDITOR_PASSWORD: Auditor!12345
+      SEED_SUPPLIER_PASSWORD: Supplier!12345
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:4000/api/v1/health/live').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    container_name: supplysense-client
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "5173:80"
+
+  redis:
+    image: redis:7-alpine
+    container_name: supplysense-redis
+    restart: unless-stopped
+    profiles: ["cache"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - supplysense-redis-data:/data
+
+volumes:
+  supplysense-postgres-data:
+  supplysense-redis-data:

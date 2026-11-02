@@ -1,0 +1,78 @@
+# 📦 SupplySence Project Map
+
+A comprehensive guide to the folders and files in the SupplySence warehouse management system.
+
+## 📂 Root Directory
+- `client/`: The React-based frontend application.
+- `server/`: The Node.js/Express backend API.
+- `ml/`: Machine Learning module for demand forecasting.
+- `docs/`: Architecture and design documentation.
+- `docker-compose.yml`: Infrastructure configuration for Docker deployment.
+- `package.json`: Root-level dependencies and script definitions.
+
+---
+
+## 💻 📁 client/ (Frontend)
+Built with React and Vite.
+- `src/main.jsx`: Entry point that mounts the React application.
+- `src/App.jsx`: The core of the frontend. Contains:
+    - `Gate`: Authentication and role selection (Customer/Manager).
+    - `CustomerPortal`: Shopping experience, compact filtering, and QR checkout.
+    - `Manager`: Operations dashboard, inventory tracking, and supplier approval.
+- `src/styles.css`: Global theme, localized Indian styling, and layout definitions.
+
+---
+
+## ⚙️ 📁 server/ (Backend)
+Built with Node.js, Express, and Prisma ORM.
+
+### 📄 server/prisma/ (Database)
+- `schema.prisma`: The single source of truth for the DB schema (Users, Inventory, Orders, Suppliers).
+- `seed.js`: Script to populate the DB with 5 Indian warehouses and demo users.
+- `migrations/`: Version-controlled SQL changes to the database.
+
+### 📄 server/src/ (Application Logic)
+- `server.js`: Server startup, port configuration, and graceful shutdown.
+- `app.js`: Express app setup, global middleware (CORS, Helmet), and route registration.
+
+#### 📁 src/routes/ (API Endpoints)
+Maps URLs to service logic.
+- `auth.routes.js`: Login, registration, and logout.
+- `commerce.routes.js`: Cart and Wishlist management.
+- `order.routes.js`: Order creation and history.
+- `payment.routes.js`: QR scan processing and payment capture.
+- `supply.routes.js`: Supplier management and PO approvals.
+- `warehouse.routes.js`: Inventory lookups and warehouse details.
+- `intelligence.routes.js`: Demand prediction triggers.
+- `dashboard.routes.js`: Aggregated data for Manager metrics.
+
+#### 📁 src/services/ (Business Logic)
+Where the "brain" of the application lives.
+- `supply.service.js`: Handles the Supplier $\rightarrow$ Warehouse loop (PO approvals, Goods Receipts).
+- `order.service.js`: Handles the Order $\rightarrow$ Inventory loop (Reservations, Stock locking).
+- `payment.service.js`: Handles the Payment $\rightarrow$ Stock subtraction loop.
+- `intelligence.service.js`: Manages demand forecasting logic.
+- `formula.service.js`: Deterministic math for reorder points.
+- `audit.service.js`: Logs every inventory move for traceability.
+- `user.service.js`: User profile and role management.
+
+#### 📁 src/middleware/ (Request Pipeline)
+- `auth.js`: JWT verification and Role-Based Access Control (RBAC).
+- `validate.js`: Zod-based request body validation.
+- `error-handler.js`: Global catch-all for `AppError` to send clean API responses.
+
+#### 📁 src/utils/ (Helpers)
+- `money.js`: Localized currency formatting for Rupees (₹).
+- `app-error.js`: Standardized error class for the entire API.
+- `response.js`: Helpers for consistent API response formats.
+
+---
+
+## 🤖 📁 ml/ (Machine Learning)
+Dedicated module for demand forecasting.
+- `train_demand_model.py`: Python script to train the RandomForest model using M5 data.
+- `demand_prediction_model.py`: A clean version of the training logic.
+- `demand_prediction_notebook.txt`: Step-by-step guide for Jupyter Notebook implementation.
+- `README.md`: Instructions for dataset placement and training.
+- `sales_dataset/`: Store for M5 CSV files (`calendar.csv`, etc.).
+- `artifacts/`: Stores the output of training (`demand_model.joblib`).

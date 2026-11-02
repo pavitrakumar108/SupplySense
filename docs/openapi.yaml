@@ -1,0 +1,958 @@
+openapi: 3.0.3
+info:
+  title: SupplySence API
+  version: 0.1.0
+  description: Versioned REST contract for the SupplySence first release.
+servers:
+  - url: /api/v1
+    description: Local or reverse-proxy API base path
+tags:
+  - name: Authentication
+  - name: Catalog
+  - name: Warehouses and inventory
+  - name: Customer commerce
+  - name: Payments
+  - name: Supply chain
+  - name: Intelligence
+  - name: Dashboards
+paths:
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a customer
+      operationId: registerCustomer
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Authenticate a user
+      operationId: login
+      requestBody:
+        $ref: '#/components/requestBodies/GenericJson'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Rotate a refresh session
+      operationId: refreshSession
+      security: [{ refreshCookie: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Revoke the current refresh session
+      operationId: logout
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [CUSTOMER, SUPPLIER, WAREHOUSE_MANAGER, ADMIN, AUDITOR] }
+      responses:
+        '204': { description: Session revoked }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get the current user
+      operationId: getCurrentUser
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [CUSTOMER, SUPPLIER, WAREHOUSE_MANAGER, ADMIN, AUDITOR] }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /users:
+    get:
+      tags: [Authentication]
+      summary: List users
+      operationId: listUsers
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/PaginatedSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Authentication]
+      summary: Create a user
+      operationId: createUser
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /users/{userId}:
+    parameters: [{ $ref: '#/components/parameters/UserId' }]
+    patch:
+      tags: [Authentication]
+      summary: Update a user
+      operationId: updateUser
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /users/{userId}/roles:
+    parameters: [{ $ref: '#/components/parameters/UserId' }]
+    patch:
+      tags: [Authentication]
+      summary: Replace user roles
+      operationId: updateUserRoles
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /users/{userId}/warehouses:
+    parameters: [{ $ref: '#/components/parameters/UserId' }]
+    patch:
+      tags: [Authentication]
+      summary: Replace manager warehouse scope
+      operationId: updateUserWarehouses
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /categories:
+    get:
+      tags: [Catalog]
+      summary: List active categories
+      operationId: listCategories
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+    post:
+      tags: [Catalog]
+      summary: Create a category
+      operationId: createCategory
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    patch:
+      tags: [Catalog]
+      summary: Update a category
+      operationId: updateCategory
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Catalog]
+      summary: Deactivate a category
+      operationId: deleteCategory
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '204': { description: Category deactivated }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /products:
+    get:
+      tags: [Catalog]
+      summary: Search and paginate active products
+      operationId: listProducts
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: categoryId, in: query, schema: { type: string, format: uuid } }
+        - { name: sort, in: query, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/PaginatedSuccess' }
+    post:
+      tags: [Catalog]
+      summary: Create a product
+      operationId: createProduct
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    patch:
+      tags: [Catalog]
+      summary: Update products
+      operationId: updateProduct
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Catalog]
+      summary: Deactivate products
+      operationId: deleteProduct
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      responses:
+        '204': { description: Product deactivated }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /products/{productId}:
+    parameters: [{ $ref: '#/components/parameters/ProductId' }]
+    get:
+      tags: [Catalog]
+      summary: Get an active product and its variants
+      operationId: getProduct
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Catalog]
+      summary: Update a product
+      operationId: updateProductById
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Catalog]
+      summary: Deactivate a product
+      operationId: deleteProductById
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      responses:
+        '204': { description: Product deactivated }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /products/{productId}/variants:
+    parameters: [{ $ref: '#/components/parameters/ProductId' }]
+    post:
+      tags: [Catalog]
+      summary: Create a product SKU
+      operationId: createProductVariant
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    patch:
+      tags: [Catalog]
+      summary: Update product SKUs
+      operationId: updateProductVariant
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Catalog]
+      summary: Deactivate product SKUs
+      operationId: deleteProductVariant
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      responses:
+        '204': { description: SKU deactivated }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /products/{productId}/images:
+    parameters: [{ $ref: '#/components/parameters/ProductId' }]
+    post:
+      tags: [Catalog]
+      summary: Add a product image reference
+      operationId: createProductImage
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Catalog]
+      summary: Delete a product image reference
+      operationId: deleteProductImage
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '204': { description: Product image deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /warehouses:
+    get:
+      tags: [Warehouses and inventory]
+      summary: List permitted warehouses
+      operationId: listWarehouses
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN] }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Warehouses and inventory]
+      summary: Create a warehouse
+      operationId: createWarehouse
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    patch:
+      tags: [Warehouses and inventory]
+      summary: Update warehouses
+      operationId: updateWarehouse
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /warehouses/{warehouseId}/inventory:
+    parameters: [{ $ref: '#/components/parameters/WarehouseId' }]
+    get:
+      tags: [Warehouses and inventory]
+      summary: View warehouse inventory
+      operationId: listInventory
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN, AUDITOR], scope: warehouse }
+      responses:
+        '200': { $ref: '#/components/responses/PaginatedSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /warehouses/{warehouseId}/inventory/adjustments:
+    parameters: [{ $ref: '#/components/parameters/WarehouseId' }]
+    post:
+      tags: [Warehouses and inventory]
+      summary: Adjust warehouse stock
+      operationId: adjustInventory
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN], scope: warehouse }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /warehouses/{warehouseId}/inventory/transfers:
+    parameters: [{ $ref: '#/components/parameters/WarehouseId' }]
+    post:
+      tags: [Warehouses and inventory]
+      summary: Transfer stock to another warehouse
+      operationId: transferInventory
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN], scope: warehouse }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /warehouses/{warehouseId}/movements:
+    parameters: [{ $ref: '#/components/parameters/WarehouseId' }]
+    get:
+      tags: [Warehouses and inventory]
+      summary: List inventory movements
+      operationId: listInventoryMovements
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN, AUDITOR], scope: warehouse }
+      responses:
+        '200': { $ref: '#/components/responses/PaginatedSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /cart:
+    get:
+      tags: [Customer commerce]
+      summary: Get the current cart
+      operationId: getCart
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [CUSTOMER], scope: own }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    post:
+      tags: [Customer commerce]
+      summary: Add an item to the current cart
+      operationId: addCartItem
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [CUSTOMER], scope: own }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    patch:
+      tags: [Customer commerce]
+      summary: Update current cart items
+      operationId: updateCart
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [CUSTOMER], scope: own }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    delete:
+      tags: [Customer commerce]
+      summary: Remove an item from the current cart
+      operationId: removeCartItem
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [CUSTOMER], scope: own }
+      responses: { '204': { description: Cart item removed } }
+  /wishlist:
+    get:
+      tags: [Customer commerce]
+      summary: Get the current wishlist
+      operationId: getWishlist
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [CUSTOMER], scope: own }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    post:
+      tags: [Customer commerce]
+      summary: Add a wishlist item
+      operationId: addWishlistItem
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [CUSTOMER], scope: own }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses: { '201': { $ref: '#/components/responses/Success' } }
+    delete:
+      tags: [Customer commerce]
+      summary: Remove a wishlist item
+      operationId: removeWishlistItem
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [CUSTOMER], scope: own }
+      responses: { '204': { description: Wishlist item removed } }
+  /checkout:
+    post:
+      tags: [Customer commerce]
+      summary: Validate cart, reserve stock, and begin payment
+      operationId: checkout
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [CUSTOMER], scope: own }
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /orders:
+    get:
+      tags: [Customer commerce]
+      summary: List permitted orders
+      operationId: listOrders
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [CUSTOMER, WAREHOUSE_MANAGER, ADMIN, AUDITOR], scope: own-or-authorized }
+      responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } }
+  /orders/{orderId}:
+    parameters: [{ $ref: '#/components/parameters/OrderId' }]
+    get:
+      tags: [Customer commerce]
+      summary: Get a permitted order
+      operationId: getOrder
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [CUSTOMER, WAREHOUSE_MANAGER, ADMIN, AUDITOR], scope: own-or-authorized }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /orders/{orderId}/cancel:
+    parameters: [{ $ref: '#/components/parameters/OrderId' }]
+    post:
+      tags: [Customer commerce]
+      summary: Cancel an order when its state allows cancellation
+      operationId: cancelOrder
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [CUSTOMER, WAREHOUSE_MANAGER, ADMIN], scope: own-or-warehouse }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /payments/{orderId}/confirm:
+    parameters: [{ $ref: '#/components/parameters/OrderId' }]
+    post:
+      tags: [Payments]
+      summary: Confirm a payment reference
+      operationId: confirmPayment
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [CUSTOMER, ADMIN], scope: order }
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /payments/{orderId}/refund:
+    parameters: [{ $ref: '#/components/parameters/OrderId' }]
+    post:
+      tags: [Payments]
+      summary: Start a refund
+      operationId: refundPayment
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN], scope: order }
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /payments/webhook:
+    post:
+      tags: [Payments]
+      summary: Receive a signed provider event
+      operationId: paymentWebhook
+      security: [{ providerSignature: [] }]
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /suppliers:
+    get:
+      tags: [Supply chain]
+      summary: List suppliers
+      operationId: listSuppliers
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN, AUDITOR, SUPPLIER], scope: assigned }
+      responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } }
+    post:
+      tags: [Supply chain]
+      summary: Create a supplier
+      operationId: createSupplier
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses: { '201': { $ref: '#/components/responses/Success' } }
+    patch:
+      tags: [Supply chain]
+      summary: Update a supplier
+      operationId: updateSupplier
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /suppliers/{supplierId}/products:
+    parameters: [{ $ref: '#/components/parameters/SupplierId' }]
+    get:
+      tags: [Supply chain]
+      summary: List supplier-product relationships
+      operationId: listSupplierProducts
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN, AUDITOR, SUPPLIER], scope: assigned }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+    post:
+      tags: [Supply chain]
+      summary: Create a supplier-product relationship
+      operationId: createSupplierProduct
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses: { '201': { $ref: '#/components/responses/Success' } }
+    patch:
+      tags: [Supply chain]
+      summary: Update a supplier-product relationship
+      operationId: updateSupplierProduct
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /purchase-orders:
+    get:
+      tags: [Supply chain]
+      summary: List permitted purchase orders
+      operationId: listPurchaseOrders
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, SUPPLIER, ADMIN], scope: assigned }
+      responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } }
+    post:
+      tags: [Supply chain]
+      summary: Create a purchase order
+      operationId: createPurchaseOrder
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN], scope: warehouse }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses: { '201': { $ref: '#/components/responses/Success' } }
+  /purchase-orders/{purchaseOrderId}/submit:
+    parameters: [{ $ref: '#/components/parameters/PurchaseOrderId' }]
+    post:
+      tags: [Supply chain]
+      summary: Submit a draft purchase order
+      operationId: submitPurchaseOrder
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN], scope: warehouse }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /purchase-orders/{purchaseOrderId}/accept:
+    parameters: [{ $ref: '#/components/parameters/PurchaseOrderId' }]
+    post:
+      tags: [Supply chain]
+      summary: Accept a purchase order
+      operationId: acceptPurchaseOrder
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [SUPPLIER], scope: supplier }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /purchase-orders/{purchaseOrderId}/reject:
+    parameters: [{ $ref: '#/components/parameters/PurchaseOrderId' }]
+    post:
+      tags: [Supply chain]
+      summary: Reject a purchase order
+      operationId: rejectPurchaseOrder
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [SUPPLIER], scope: supplier }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /purchase-orders/{purchaseOrderId}/shipments:
+    parameters: [{ $ref: '#/components/parameters/PurchaseOrderId' }]
+    post:
+      tags: [Supply chain]
+      summary: Record a supplier shipment
+      operationId: createShipment
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [SUPPLIER], scope: supplier }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses: { '201': { $ref: '#/components/responses/Success' } }
+  /purchase-orders/{purchaseOrderId}/goods-receipts:
+    parameters: [{ $ref: '#/components/parameters/PurchaseOrderId' }]
+    post:
+      tags: [Supply chain]
+      summary: Receive goods into the warehouse
+      operationId: createGoodsReceipt
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN], scope: warehouse }
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /intelligence/run:
+    post:
+      tags: [Intelligence]
+      summary: Generate forecasts, anomalies, and recommendations
+      operationId: runIntelligence
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN], scope: warehouse }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /analytics/forecasts:
+    get:
+      tags: [Intelligence]
+      summary: List demand forecasts
+      operationId: listForecasts
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN, AUDITOR], scope: warehouse }
+      responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } }
+  /anomalies:
+    get:
+      tags: [Intelligence]
+      summary: List demand anomalies
+      operationId: listAnomalies
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN, AUDITOR], scope: warehouse }
+      responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } }
+  /recommendations:
+    get:
+      tags: [Intelligence]
+      summary: List reorder recommendations
+      operationId: listRecommendations
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN, AUDITOR], scope: warehouse }
+      responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } }
+  /recommendations/{recommendationId}:
+    parameters: [{ $ref: '#/components/parameters/RecommendationId' }]
+    get:
+      tags: [Intelligence]
+      summary: Get a recommendation and its explanation
+      operationId: getRecommendation
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN, AUDITOR], scope: warehouse }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /recommendations/{recommendationId}/approve:
+    parameters: [{ $ref: '#/components/parameters/RecommendationId' }]
+    post:
+      tags: [Intelligence]
+      summary: Approve a recommendation and create a draft purchase order
+      operationId: approveRecommendation
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN], scope: warehouse }
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /recommendations/{recommendationId}/reject:
+    parameters: [{ $ref: '#/components/parameters/RecommendationId' }]
+    post:
+      tags: [Intelligence]
+      summary: Reject a recommendation
+      operationId: rejectRecommendation
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN], scope: warehouse }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /suppliers/{supplierId}:
+    parameters: [{ $ref: '#/components/parameters/SupplierId' }]
+    patch:
+      tags: [Supply chain]
+      summary: Update a supplier by ID
+      operationId: updateSupplierById
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /purchase-orders/{purchaseOrderId}:
+    parameters: [{ $ref: '#/components/parameters/PurchaseOrderId' }]
+    get:
+      tags: [Supply chain]
+      summary: Get a permitted purchase order
+      operationId: getPurchaseOrder
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, SUPPLIER, ADMIN, AUDITOR], scope: assigned }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /suppliers/{supplierId}/products/{supplierProductId}:
+    parameters:
+      - { $ref: '#/components/parameters/SupplierId' }
+      - { name: supplierProductId, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [Supply chain]
+      summary: Update a supplier-product relationship by ID
+      operationId: updateSupplierProductById
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN] }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /purchase-orders/{purchaseOrderId}/cancel:
+    parameters: [{ $ref: '#/components/parameters/PurchaseOrderId' }]
+    post:
+      tags: [Supply chain]
+      summary: Cancel a draft or submitted purchase order
+      operationId: cancelPurchaseOrder
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN], scope: warehouse }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /shipments:
+    get:
+      tags: [Supply chain]
+      summary: List permitted shipments
+      operationId: listShipments
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, SUPPLIER, ADMIN, AUDITOR], scope: assigned }
+      responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } }
+  /shipments/{shipmentId}:
+    parameters:
+      - { name: shipmentId, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [Supply chain]
+      summary: Update shipment tracking status
+      operationId: updateShipment
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [SUPPLIER, ADMIN], scope: supplier }
+      requestBody: { $ref: '#/components/requestBodies/GenericJson' }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /goods-receipts:
+    get:
+      tags: [Supply chain]
+      summary: List goods receipts
+      operationId: listGoodsReceipts
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN], scope: warehouse }
+      responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } }
+  /traceability/{variantId}:
+    parameters:
+      - { name: variantId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Supply chain]
+      summary: Trace a SKU across inventory and supply-chain events
+      operationId: getTraceability
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, SUPPLIER, ADMIN, AUDITOR], scope: assigned }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /analytics/sales-history:
+    get:
+      tags: [Intelligence]
+      summary: List daily sales history
+      operationId: listSalesHistory
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN, AUDITOR], scope: warehouse }
+      responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } }
+  /analytics/anomalies:
+    get:
+      tags: [Intelligence]
+      summary: List demand anomalies
+      operationId: listAnalyticsAnomalies
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN, AUDITOR], scope: warehouse }
+      responses: { '200': { $ref: '#/components/responses/PaginatedSuccess' } }
+  /dashboards/manager:
+    get:
+      tags: [Dashboards]
+      summary: Get the manager dashboard
+      operationId: getManagerDashboard
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [WAREHOUSE_MANAGER, ADMIN, AUDITOR], scope: warehouse }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /dashboards/admin:
+    get:
+      tags: [Dashboards]
+      summary: Get the admin dashboard
+      operationId: getAdminDashboard
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [ADMIN, AUDITOR] }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+  /dashboards/supplier:
+    get:
+      tags: [Dashboards]
+      summary: Get the supplier dashboard
+      operationId: getSupplierDashboard
+      security: [{ bearerAuth: [] }]
+      x-access: { roles: [SUPPLIER, ADMIN], scope: supplier }
+      responses: { '200': { $ref: '#/components/responses/Success' } }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: refreshToken
+    providerSignature:
+      type: apiKey
+      in: header
+      name: x-provider-signature
+  parameters:
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    PageSize: { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: true, schema: { type: string, maxLength: 160 } }
+    ProductId: { name: productId, in: path, required: true, schema: { type: string, format: uuid } }
+    UserId: { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+    WarehouseId: { name: warehouseId, in: path, required: true, schema: { type: string, format: uuid } }
+    OrderId: { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
+    SupplierId: { name: supplierId, in: path, required: true, schema: { type: string, format: uuid } }
+    PurchaseOrderId: { name: purchaseOrderId, in: path, required: true, schema: { type: string, format: uuid } }
+    RecommendationId: { name: recommendationId, in: path, required: true, schema: { type: string, format: uuid } }
+  requestBodies:
+    GenericJson:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+  responses:
+    Success:
+      description: Successful operation
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/SuccessResponse' }
+    PaginatedSuccess:
+      description: Successful paginated operation
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PaginatedResponse' }
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unauthorized:
+      description: Authentication required or invalid
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Forbidden:
+      description: Authenticated but outside the permitted role or scope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Resource not found or hidden by scope policy
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Conflict:
+      description: State or idempotency conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    SuccessResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: {}
+        meta:
+          type: object
+          required: [requestId]
+          properties:
+            requestId: { type: string }
+    PaginatedResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            meta:
+              type: object
+              required: [page, pageSize, totalItems, totalPages, requestId]
+              properties:
+                page: { type: integer }
+                pageSize: { type: integer }
+                totalItems: { type: integer }
+                totalPages: { type: integer }
+                requestId: { type: string }
+    ErrorResponse:
+      type: object
+      required: [success, error]
+      properties:
+        success: { type: boolean, enum: [false] }
+        error:
+          type: object
+          required: [code, message, requestId]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: {}
+            requestId: { type: string }

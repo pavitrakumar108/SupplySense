@@ -1,0 +1,22 @@
+node_modules/
+.venv/
+dist/
+build/
+.env
+.env.*
+!.env.example
+coverage/
+tmp/
+.DS_Store
+*.log
+
+# Prisma local artifacts
+server/prisma/dev.db
+server/prisma/dev.db-journal
+.local/
+
+# Editor and OS files
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
