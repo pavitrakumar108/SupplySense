@@ -54,7 +54,7 @@ These rules are implementation-independent. Services, database constraints, and 
 5. A shipped or delivered order cannot be cancelled through the normal customer endpoint.
 6. A repeated idempotency key returns the original operation result.
 7. The same idempotency key cannot be reused for a materially different request.
-8. Payment credentials are handled by the payment provider; SupplySence stores references and states only.
+8. Payment credentials are handled by the payment provider; SupplySense stores references and states only.
 
 ## 6. Suppliers and purchase orders
 

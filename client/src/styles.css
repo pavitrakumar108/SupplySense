@@ -37,7 +37,7 @@ a { color: inherit; text-decoration: none; }
 .gate-benefits span { border: 1px solid #4b776d; border-radius: 99px; color: #d9f3e9; font-size: .8rem; padding: .6rem .8rem; }
 .gate-card { align-self: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); margin: 2rem; max-width: 520px; padding: 2rem; width: calc(100% - 4rem); }
 .gate-card h2 { font-size: 2rem; margin: 1.5rem 0 .75rem; color: var(--primary-dark); }
-.role-choice { background: #edf4f0; border-radius: var(--radius-sm); display: grid; grid-template-columns: 1fr 1fr; padding: .3rem; }
+.role-choice { background: #edf4f0; border-radius: var(--radius-sm); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: .3rem; }
 .role-choice button { background: transparent; border: 0; border-radius: var(--radius-sm); color: var(--text-muted); cursor: pointer; display: grid; font: inherit; gap: .2rem; padding: .8rem; text-align: left; transition: all 0.2s; }
 .role-choice button.active { background: var(--surface); box-shadow: var(--shadow-sm); color: var(--primary); }
 .role-choice span { font-size: .72rem; }

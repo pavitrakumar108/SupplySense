@@ -1,6 +1,6 @@
-# 📦 SupplySence Project Map
+# 📦 SupplySense Project Map
 
-A comprehensive guide to the folders and files in the SupplySence warehouse management system.
+A comprehensive guide to the folders and files in the SupplySense warehouse management system.
 
 ## 📂 Root Directory
 - `client/`: The React-based frontend application.

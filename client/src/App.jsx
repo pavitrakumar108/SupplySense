@@ -36,7 +36,7 @@ const money = (value) => `₹${Number(value ?? 0).toLocaleString('en-IN', { mini
 const roleCodes = (user) => user?.roles?.map((role) => role.code) ?? [];
 const cardOfferDiscount = (subtotal) => Math.min(Math.round(Number(subtotal ?? 0) * 10) / 100, 500);
 const invoiceSeller = {
-  name: import.meta.env.VITE_INVOICE_SELLER_NAME || 'SupplySence',
+  name: import.meta.env.VITE_INVOICE_SELLER_NAME || 'SupplySense',
   address: import.meta.env.VITE_INVOICE_SELLER_ADDRESS || 'Seller address not configured',
   gstin: import.meta.env.VITE_INVOICE_SELLER_GSTIN || 'Not configured',
   state: import.meta.env.VITE_INVOICE_SELLER_STATE || 'Not configured',
@@ -56,10 +56,14 @@ function Gate({ login, onBack, initialRole = 'customer', initialMode = 'login' }
     setBusy(true);
     setError('');
     try {
-      login(await api(register ? '/auth/register' : `/auth/${role}/login`, {
+      const data = await api(register ? '/auth/register' : role === 'admin' ? '/auth/login' : `/auth/${role}/login`, {
         method: 'POST',
         body: JSON.stringify(form),
-      }));
+      });
+      if (role === 'admin' && !roleCodes(data.user).includes('ADMIN')) {
+        throw new Error('This account does not have admin access.');
+      }
+      login(data);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -70,7 +74,7 @@ function Gate({ login, onBack, initialRole = 'customer', initialMode = 'login' }
   return (
     <main className="gate-shell">
       <section className="gate-intro">
-        <a className="brand" href="/"><span className="brand-mark">S</span>SupplySence</a>
+        <a className="brand" href="/"><span className="brand-mark">S</span>SupplySense</a>
         {onBack && <button className="link-button gate-back" onClick={onBack}>← Back to the shop</button>}
         <div>
           <p className="eyebrow">CONNECTED OPERATIONS</p>
@@ -92,8 +96,11 @@ function Gate({ login, onBack, initialRole = 'customer', initialMode = 'login' }
           <button className={role === 'manager' ? 'active' : ''} onClick={() => { setRole('manager'); setMode('login'); }}>
             <strong>Manager</strong><span>Warehouse & demand planning</span>
           </button>
+          <button className={role === 'admin' ? 'active' : ''} onClick={() => { setRole('admin'); setMode('login'); }}>
+            <strong>Admin</strong><span>User accounts & controls</span>
+          </button>
         </div>
-        <h2>{register ? 'Create customer account' : `${role === 'manager' ? 'Manager' : 'Customer'} login`}</h2>
+        <h2>{register ? 'Create customer account' : `${role === 'admin' ? 'Admin' : role === 'manager' ? 'Manager' : 'Customer'} login`}</h2>
         <form className="gate-form" onSubmit={submit}>
           {register && (
             <label>Full name<input required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} /></label>
@@ -119,10 +126,33 @@ function Manager({ user, logout }) {
   const [warehouses, setWarehouses] = useState([]);
   const [warehouseId, setWarehouseId] = useState('');
   const [view, setView] = useState('dashboard');
+  const [users, setUsers] = useState([]);
+  const [registeredUserCount, setRegisteredUserCount] = useState(0);
+  const [usersLoaded, setUsersLoaded] = useState(false);
   const [data, setData] = useState({ dashboard: null, inventory: [], recommendations: [], forecasts: [], anomalies: [] });
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const loadUsers = async () => {
+    try {
+      setBusy(true);
+      setError('');
+      const firstPage = await apiEnvelope('/users?page=1&pageSize=100');
+      const pages = firstPage.meta?.totalPages ?? 1;
+      const remainingPages = await Promise.all(
+        Array.from({ length: Math.max(0, pages - 1) }, (_, index) => api(`/users?page=${index + 2}&pageSize=100`)),
+      );
+      const allUsers = [...(firstPage.data ?? []), ...remainingPages.flat()];
+      setUsers(allUsers.filter((account) => account.isActive));
+      setRegisteredUserCount(firstPage.meta?.totalItems ?? allUsers.length);
+      setUsersLoaded(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const load = async (id = warehouseId) => {
     if (!id) return;
@@ -186,15 +216,16 @@ function Manager({ user, logout }) {
   return (
     <div className="manager-shell">
       <aside className="manager-sidebar">
-        <a className="brand" href="#"><span className="brand-mark">S</span>SupplySence</a>
+        <a className="brand" href="#"><span className="brand-mark">S</span>SupplySense</a>
         <p className="sidebar-label">MANAGER WORKSPACE</p>
         {[
           ['dashboard', 'Warehouse Overview'],
           ['inventory', 'Product Distribution'],
           ['demand', 'Demand Prediction'],
           ['suppliers', 'Supplier Management'],
+          ...(roleCodes(user).includes('ADMIN') ? [['users', 'User Accounts']] : []),
         ].map(([id, title]) => (
-          <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>
+          <button key={id} className={view === id ? 'active' : ''} onClick={() => { setView(id); if (id === 'users') loadUsers(); }}>
             {title}
           </button>
         ))}
@@ -208,13 +239,13 @@ function Manager({ user, logout }) {
         <header className="manager-header">
           <div>
             <p className="eyebrow">OPERATIONS CONTROL</p>
-            <h1>{view === 'dashboard' ? 'Warehouse Overview' : view === 'inventory' ? 'Product Distribution' : 'Demand Prediction'}</h1>
+            <h1>{view === 'dashboard' ? 'Warehouse Overview' : view === 'inventory' ? 'Product Distribution' : view === 'suppliers' ? 'Supplier Management' : view === 'users' ? 'User Accounts' : 'Demand Prediction'}</h1>
           </div>
           <div>
-            <select value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); load(e.target.value); }}>
+            {view !== 'users' && <select value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); load(e.target.value); }}>
               {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name} ({w.code})</option>)}
-            </select>
-            <button className="button button-secondary" disabled={busy} onClick={() => load()}>Refresh Data</button>
+            </select>}
+            <button className="button button-secondary" disabled={busy} onClick={() => view === 'users' ? loadUsers() : load()}>{busy ? 'Loading…' : 'Refresh Data'}</button>
           </div>
         </header>
 
@@ -296,6 +327,36 @@ function Manager({ user, logout }) {
             </div>
             {!data.dashboard?.openPurchaseOrdersList?.length && <p className="empty-state">No pending supplier orders to approve.</p>}
           </section>
+        )}
+
+        {view === 'users' && (
+          <>
+            <div className="manager-metrics">
+              <article><span>Registered Accounts</span><strong>{usersLoaded ? registeredUserCount : '—'}</strong></article>
+              <article><span>Active Accounts</span><strong>{usersLoaded ? users.length : '—'}</strong></article>
+            </div>
+            <section className="manager-card">
+              <p className="eyebrow">ACCOUNT DIRECTORY</p>
+              <h2>Active users</h2>
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>Name</th><th>Email</th><th>Roles</th><th>Registered</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {users.map((account) => (
+                      <tr key={account.id}>
+                        <td>{account.fullName}</td>
+                        <td>{account.email}</td>
+                        <td>{account.roles.map((role) => role.name).join(', ') || '—'}</td>
+                        <td>{new Date(account.createdAt).toLocaleDateString()}</td>
+                        <td><span className="status-chip">Active</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {usersLoaded && !users.length && <p className="empty-state">No active users found.</p>}
+            </section>
+          </>
         )}
 
         {view === 'demand' && (
@@ -488,7 +549,7 @@ function CustomerPortal({ user, logout, openLogin }) {
   const [scanDetected, setScanDetected] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showChat, setShowChat] = useState(false);
-  const [messages, setMessages] = useState([{ sender: 'bot', text: 'Hello! Welcome to SupplySence. How can I help you today?' }]);
+  const [messages, setMessages] = useState([{ sender: 'bot', text: 'Hello! Welcome to SupplySense. How can I help you today?' }]);
   const [chatInput, setChatInput] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [failedProductIds, setFailedProductIds] = useState(() => new Set());
@@ -774,7 +835,7 @@ function CustomerPortal({ user, logout, openLogin }) {
     setTimeout(() => {
       let botResponse = 'Thanks for your message! Our support team is looking into it and will reply shortly.';
       if (input.startsWith('hi') || input.startsWith('hello') || input.startsWith('hey')) {
-        botResponse = 'Hello! Welcome to SupplySence. How can I help you with your shopping today?';
+        botResponse = 'Hello! Welcome to SupplySense. How can I help you with your shopping today?';
       } else if (input.includes('product') || input.includes('available') || input.includes('search') || input.includes('do you have')) {
         const foundProduct = products.find(p => input.includes(p.name.toLowerCase()));
         if (foundProduct) {
@@ -797,7 +858,7 @@ function CustomerPortal({ user, logout, openLogin }) {
   const qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${activeQrOrder?.scanToken ?? ''}`;
 
   const infoPages = {
-    'about': { title: 'About Us', content: 'SupplySence is a leading connected operations platform providing instant inventory tracking and demand intelligence for a seamless supply chain experience.' },
+    'about': { title: 'About Us', content: 'SupplySense is a leading connected operations platform providing instant inventory tracking and demand intelligence for a seamless supply chain experience.' },
     'faq': { title: 'FAQ', content: 'Our FAQ section provides answers to common questions about shipping, returns, and account management. We strive for 100% customer satisfaction.' },
     'shipping': { title: 'Shipping Policy', content: 'We offer worldwide shipping with real-time tracking. Most orders are processed within 24 hours and delivered within 3-7 business days.' },
     'terms': { title: 'Terms of Service', content: 'Our terms of service ensure a fair and transparent marketplace for all our customers and partners. Please read them carefully.' },
@@ -807,7 +868,7 @@ function CustomerPortal({ user, logout, openLogin }) {
     <div className="customer-portal">
       <header className="portal-header">
         <div className="header-brand">
-          <a className="brand" href="#"><span className="brand-mark">S</span>SupplySence</a>
+          <a className="brand" href="#"><span className="brand-mark">S</span>SupplySense</a>
           <nav className="header-nav">
             <button className={page === 'shop' ? 'active' : ''} onClick={() => navigate('shop')}>Shop</button>
             <button className={page === 'cart' ? 'active' : ''} onClick={() => navigate('cart')}>Cart ({count})</button>
@@ -850,7 +911,7 @@ function CustomerPortal({ user, logout, openLogin }) {
       {showChat && (
         <div className="chat-window">
           <div className="chat-header">
-            <strong>SupplySence Support</strong>
+            <strong>SupplySense Support</strong>
             <button className="close-chat" onClick={() => setShowChat(false)}>✕</button>
           </div>
           <div className="chat-messages">
@@ -1249,7 +1310,7 @@ function CustomerPortal({ user, logout, openLogin }) {
       <footer className="portal-footer">
         <div className="footer-grid">
           <div className="footer-col">
-            <a className="brand" href="#"><span className="brand-mark">S</span>SupplySence</a>
+            <a className="brand" href="#"><span className="brand-mark">S</span>SupplySense</a>
             <p className="footer-desc">Your one-stop destination for all your supply needs. Quality, speed, and reliability.</p>
           </div>
           <div className="footer-col">
@@ -1272,7 +1333,7 @@ function CustomerPortal({ user, logout, openLogin }) {
             <a className="button button-primary newsletter-btn" href="mailto:support@supplysense.com">Email our team <span aria-hidden="true">→</span></a>
           </div>
         </div>
-        <div className="footer-bottom">&copy; 2026 SupplySence Inc. All rights reserved.</div>
+        <div className="footer-bottom">&copy; 2026 SupplySense Inc. All rights reserved.</div>
       </footer>
 
       {invoiceOrder && <InvoiceDocument order={invoiceOrder} onClose={() => setInvoiceOrder(null)} />}
@@ -1329,7 +1390,7 @@ export default function App() {
     setUser(null);
   };
 
-  if (!sessionReady) return <main className="session-loading" role="status">Restoring your SupplySence workspace…</main>;
+  if (!sessionReady) return <main className="session-loading" role="status">Restoring your SupplySense workspace…</main>;
   if (gate) return <Gate login={login} initialRole={gate.role} initialMode={gate.mode} onBack={() => setGate(null)} />;
 
   if (user && roleCodes(user).some((role) => ['WAREHOUSE_MANAGER', 'ADMIN', 'AUDITOR'].includes(role))) {

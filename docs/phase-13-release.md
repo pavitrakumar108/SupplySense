@@ -46,7 +46,7 @@ The Docker stack uses its own named PostgreSQL volume and host port `5432`; the 
 
 ## Payment boundary
 
-The current checkout uses the existing local mock payment adapter so all ordering and inventory transactions can be tested offline. A real card flow cannot be entirely local: configure a provider such as Stripe or Razorpay with test credentials, a client publishable key, and a signed webhook endpoint before enabling live-provider capture. Do not collect raw card numbers in the SupplySence API.
+The current checkout uses the existing local mock payment adapter so all ordering and inventory transactions can be tested offline. A real card flow cannot be entirely local: configure a provider such as Stripe or Razorpay with test credentials, a client publishable key, and a signed webhook endpoint before enabling live-provider capture. Do not collect raw card numbers in the SupplySense API.
 
 ## Production boundary
 

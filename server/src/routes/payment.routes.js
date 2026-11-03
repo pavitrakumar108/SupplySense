@@ -52,7 +52,7 @@ export function createPaymentRouter({ db }) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SupplySence - Payment Successful</title>
+  <title>SupplySense - Payment Successful</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0fdf4; color: #14532d; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 1.5rem; box-sizing: border-box; }
     .card { background: #fff; border: 1px solid #bbf7d0; border-radius: 1.25rem; box-shadow: 0 10px 25px -5px rgba(20, 83, 45, 0.1); padding: 2.5rem 2rem; max-width: 440px; width: 100%; text-align: center; }
@@ -90,7 +90,7 @@ export function createPaymentRouter({ db }) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SupplySence - Payment Status</title>
+  <title>SupplySense - Payment Status</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #fef2f2; color: #991b1b; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 1.5rem; box-sizing: border-box; }
     .card { background: #fff; border: 1px solid #fecaca; border-radius: 1.25rem; box-shadow: 0 10px 25px -5px rgba(153, 27, 27, 0.1); padding: 2.5rem 2rem; max-width: 440px; width: 100%; text-align: center; }

@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: SupplySence API
+  title: SupplySense API
   version: 0.1.0
-  description: Versioned REST contract for the SupplySence first release.
+  description: Versioned REST contract for the SupplySense first release.
 servers:
   - url: /api/v1
     description: Local or reverse-proxy API base path

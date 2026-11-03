@@ -1,6 +1,6 @@
-# SupplySence
+# SupplySense
 
-SupplySence is a secure multi-warehouse retail and replenishment platform. Customer orders create operational data; warehouse managers use that data to make explainable replenishment decisions.
+SupplySense is a secure multi-warehouse retail and replenishment platform. Customer orders create operational data; warehouse managers use that data to make explainable replenishment decisions.
 
 ## Current status
 

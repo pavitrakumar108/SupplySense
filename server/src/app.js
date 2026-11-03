@@ -64,7 +64,7 @@ export function createApp({ db } = {}) {
     response.json({
       success: true,
       data: {
-        name: 'SupplySence API',
+        name: 'SupplySense API',
         version: '0.1.0',
         phase: '13 - release',
       },

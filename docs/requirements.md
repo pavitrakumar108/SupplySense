@@ -1,4 +1,4 @@
-# SupplySence Requirements
+# SupplySense Requirements
 
 ## 1. Document purpose
 
@@ -6,7 +6,7 @@ This document freezes the Phase 1 product scope and acceptance criteria for the 
 
 ## 2. Problem statement
 
-Retail stock is split across warehouses, while customer demand and supplier replenishment are managed separately. SupplySence connects customer transactions, warehouse inventory, suppliers, and deterministic demand calculations so a manager can decide what to reorder and why.
+Retail stock is split across warehouses, while customer demand and supplier replenishment are managed separately. SupplySense connects customer transactions, warehouse inventory, suppliers, and deterministic demand calculations so a manager can decide what to reorder and why.
 
 ## 3. Goals
 

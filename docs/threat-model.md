@@ -1,4 +1,4 @@
-# SupplySence Threat Model
+# SupplySense Threat Model
 
 ## 1. Assets to protect
 

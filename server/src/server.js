@@ -6,7 +6,7 @@ import { releaseExpiredReservations } from './services/reservation.service.js';
 
 const app = createApp({ db: prisma });
 const server = app.listen(env.PORT, () => {
-  logger.info({ port: env.PORT, environment: env.NODE_ENV }, 'SupplySence API started');
+  logger.info({ port: env.PORT, environment: env.NODE_ENV }, 'SupplySense API started');
 });
 const reservationExpiryTimer = setInterval(() => {
   releaseExpiredReservations(prisma).catch((error) => logger.error({ err: error }, 'reservation expiry worker failed'));

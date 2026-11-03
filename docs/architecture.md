@@ -1,8 +1,8 @@
-# SupplySence Architecture
+# SupplySense Architecture
 
 ## 1. Architecture style
 
-SupplySence uses a React single-page application and a Node.js/Express feature-based modular monolith. PostgreSQL is the source of truth for transactional state. The deterministic intelligence engine runs inside the backend and can later be replaced behind the same interface by an ML service.
+SupplySense uses a React single-page application and a Node.js/Express feature-based modular monolith. PostgreSQL is the source of truth for transactional state. The deterministic intelligence engine runs inside the backend and can later be replaced behind the same interface by an ML service.
 
 ## 2. Component view
 

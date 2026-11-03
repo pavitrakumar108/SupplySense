@@ -1,6 +1,6 @@
 # Project Structure & File Manifest
 
-This document tracks the files and folders in the SupplySence project, their purpose, and their last update.
+This document tracks the files and folders in the SupplySense project, their purpose, and their last update.
 
 ## 📁 client/
 Frontend application built with React and Vite.
