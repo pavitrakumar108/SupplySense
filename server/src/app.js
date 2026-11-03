@@ -12,7 +12,7 @@ import { notFound } from './middleware/not-found.js';
 import { requestId } from './middleware/request-id.js';
 import { createApiRouter } from './routes/index.js';
 
-const clientBuildDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../client/dist');
+const clientBuildDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../client/dist');
 
 function allowedOrigins() {
   return [...env.CLIENT_URL.split(','), process.env.RENDER_EXTERNAL_URL ?? '']
