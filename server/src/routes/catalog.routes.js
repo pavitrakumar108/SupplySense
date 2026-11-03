@@ -46,7 +46,7 @@ const deleteImageRequest = z.object({ params: z.object({ productId: uuid }), bod
 const categoryCreateRequest = z.object({ body: z.object({ name: z.string().trim().min(1).max(120), slug: z.string().trim().min(1).max(140).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/), isActive: z.boolean().default(true) }) });
 const categoryUpdateRequest = z.object({ body: z.object({ categoryId: uuid, name: z.string().trim().min(1).max(120).optional(), slug: z.string().trim().min(1).max(140).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(), isActive: z.boolean().optional() }).refine((body) => Object.keys(body).length > 1, 'At least one field is required.') });
 const categoryDeleteRequest = z.object({ body: z.object({ categoryId: uuid }) });
-const productListRequest = z.object({ query: z.object({ page: z.string().optional(), pageSize: z.string().optional(), search: z.string().trim().max(180).optional(), marketplaceBrand: z.string().trim().max(100).optional(), categoryId: uuid.optional(), variantOption: z.string().trim().max(80).optional(), sort: z.enum(['name', 'createdAt', 'slug', 'random']).default('name'), direction: z.enum(['asc', 'desc']).default('asc'), minPrice: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(), maxPrice: z.string().regex(/^\d+(\.\d{1,2})?$/).optional() }) });
+const productListRequest = z.object({ query: z.object({ page: z.string().optional(), pageSize: z.string().optional(), search: z.string().trim().max(180).optional(), marketplaceBrand: z.string().trim().max(100).optional(), categoryId: uuid.optional(), variantOption: z.string().trim().max(80).optional(), sort: z.enum(['name', 'createdAt', 'slug', 'random']).default('name'), randomSeed: z.string().trim().max(100).optional(), direction: z.enum(['asc', 'desc']).default('asc'), minPrice: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(), maxPrice: z.string().regex(/^\d+(\.\d{1,2})?$/).optional() }) });
 
 const variantInclude = {
   images: { orderBy: { sortOrder: 'asc' } },
@@ -116,7 +116,7 @@ export function createCatalogRouter({ db }) {
 
   router.get('/products', validate(productListRequest), asyncHandler(async (request, response) => {
     const { page, pageSize, skip, take } = getPagination(request.validated.query);
-    const { search, marketplaceBrand, categoryId, sort, direction, minPrice, maxPrice, variantOption } = request.validated.query;
+    const { search, marketplaceBrand, categoryId, sort, randomSeed = '', direction, minPrice, maxPrice, variantOption } = request.validated.query;
     const matchingVariants = {
       isActive: true,
       sku: { startsWith: 'SS-CUR-' },
@@ -148,7 +148,7 @@ export function createCatalogRouter({ db }) {
     let totalItems;
     if (sort === 'random') {
       const allProductIds = await db.product.findMany({ where, select: { id: true, slug: true } });
-      allProductIds.sort((left, right) => catalogOrderHash(left.slug) - catalogOrderHash(right.slug) || left.slug.localeCompare(right.slug));
+      allProductIds.sort((left, right) => catalogOrderHash(`${randomSeed}:${left.slug}`) - catalogOrderHash(`${randomSeed}:${right.slug}`) || left.slug.localeCompare(right.slug));
       totalItems = allProductIds.length;
       const pageIds = allProductIds.slice(skip, skip + take).map(({ id }) => id);
       const pageProducts = pageIds.length ? await db.product.findMany({ where: { id: { in: pageIds } }, include: productInclude }) : [];

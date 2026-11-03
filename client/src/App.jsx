@@ -464,6 +464,8 @@ function CustomerPortal({ user, logout, openLogin }) {
   const [maxPrice, setMaxPrice] = useState('');
   const [sort, setSort] = useState('random');
   const [catalogPage, setCatalogPage] = useState(1);
+  const [catalogSeed] = useState(() => crypto.randomUUID());
+  const [catalogRefreshVersion, setCatalogRefreshVersion] = useState(0);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedVariantId, setSelectedVariantId] = useState('');
   const [address, setAddress] = useState({
@@ -526,6 +528,7 @@ function CustomerPortal({ user, logout, openLogin }) {
           page: String(catalogPage),
           pageSize: '24',
           sort,
+          randomSeed: catalogSeed,
           direction: sort === 'createdAt' ? 'desc' : 'asc',
         });
         if (search.trim()) {
@@ -560,7 +563,7 @@ function CustomerPortal({ user, logout, openLogin }) {
       active = false;
       clearTimeout(timer);
     };
-  }, [search, category, brandFilter, variantOption, minPrice, maxPrice, sort, catalogPage]);
+  }, [search, category, brandFilter, variantOption, minPrice, maxPrice, sort, catalogPage, catalogSeed, catalogRefreshVersion]);
 
   useEffect(() => {
     if (!selectedProduct) return undefined;
@@ -585,6 +588,7 @@ function CustomerPortal({ user, logout, openLogin }) {
           settled = true;
           clearInterval(interval);
           setScanDetected(true);
+          setCatalogRefreshVersion((version) => version + 1);
           setNotice(`QR scanned. Order #${orderData.id.slice(0, 8)} paid and stock committed.`);
           await load();
           setTimeout(() => {
@@ -722,6 +726,7 @@ function CustomerPortal({ user, logout, openLogin }) {
         body: JSON.stringify({ shippingAddress: address, paymentMethod: 'COD' }),
       });
       setNotice(`Order #${order.id.slice(0, 8)} placed. Pay ${money(order.totalAmount)} in cash when it arrives.`);
+      setCatalogRefreshVersion((version) => version + 1);
       await load();
       navigate('orders');
     } catch (err) {
@@ -748,6 +753,7 @@ function CustomerPortal({ user, logout, openLogin }) {
         body: '{}',
       });
       setNotice('Card payment authorized. Your order has been placed.');
+      setCatalogRefreshVersion((version) => version + 1);
       await load();
       navigate('orders');
     } catch (err) {
