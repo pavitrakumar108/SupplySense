@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: supplysense
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build && npm run db:generate
+    startCommand: npm run db:deploy && npm run db:seed && npm --workspace server run start
+    healthCheckPath: /api/v1/health/live
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: MOCK_PAYMENT_WEBHOOK_SECRET
+        generateValue: true
+      - key: SEED_ADMIN_PASSWORD
+        generateValue: true
+      - key: SEED_CUSTOMER_PASSWORD
+        generateValue: true
+      - key: SEED_MANAGER_PASSWORD
+        generateValue: true
+      - key: SEED_AUDITOR_PASSWORD
+        generateValue: true
+      - key: SEED_SUPPLIER_PASSWORD
+        generateValue: true

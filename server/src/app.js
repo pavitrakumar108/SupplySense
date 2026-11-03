@@ -2,6 +2,8 @@ import cors from 'cors';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import pinoHttp from 'pino-http';
 import { env } from './config/env.js';
 import { logger } from './config/logger.js';
@@ -10,8 +12,10 @@ import { notFound } from './middleware/not-found.js';
 import { requestId } from './middleware/request-id.js';
 import { createApiRouter } from './routes/index.js';
 
+const clientBuildDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../client/dist');
+
 function allowedOrigins() {
-  return env.CLIENT_URL.split(',')
+  return [...env.CLIENT_URL.split(','), process.env.RENDER_EXTERNAL_URL ?? '']
     .map((origin) => origin.trim())
     .filter(Boolean);
 }
@@ -54,6 +58,9 @@ export function createApp({ db } = {}) {
   app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 
   app.get('/', (request, response) => {
+    if (env.NODE_ENV === 'production') {
+      return response.sendFile(path.join(clientBuildDirectory, 'index.html'));
+    }
     response.json({
       success: true,
       data: {
@@ -66,6 +73,15 @@ export function createApp({ db } = {}) {
   });
 
   app.use('/api/v1', createApiRouter({ db }));
+
+  if (env.NODE_ENV === 'production') {
+    app.use(express.static(clientBuildDirectory));
+    app.get(/.*/, (request, response, next) => {
+      if (!request.accepts('html')) return next();
+      response.sendFile(path.join(clientBuildDirectory, 'index.html'));
+    });
+  }
+
   app.use(notFound);
   app.use(errorHandler);
 
