@@ -3,7 +3,7 @@ services:
     name: supplysense
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build && npm run db:generate
+    buildCommand: npm ci --include=dev && npm run build && npm run db:generate
     startCommand: npm run db:deploy && npm run db:seed && npm --workspace server run start
     healthCheckPath: /api/v1/health/live
     envVars:
