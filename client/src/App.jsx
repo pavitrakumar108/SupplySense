@@ -35,6 +35,26 @@ async function api(path, options = {}) {
 const money = (value) => `₹${Number(value ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const roleCodes = (user) => user?.roles?.map((role) => role.code) ?? [];
 const cardOfferDiscount = (subtotal) => Math.min(Math.round(Number(subtotal ?? 0) * 10) / 100, 500);
+const guestCartKey = 'supplysense_guest_cart';
+function readGuestCart() {
+  try {
+    return JSON.parse(localStorage.getItem(guestCartKey) || 'null') ?? { id: 'guest-cart', userId: null, items: [], subtotal: 0 };
+  } catch {
+    return { id: 'guest-cart', userId: null, items: [], subtotal: 0 };
+  }
+}
+function makeGuestCart(items) {
+  const nextItems = items.map((item) => {
+    const lineTotal = Number(item.variant.price) * item.quantity;
+    return { ...item, lineTotal: lineTotal.toFixed(2) };
+  });
+  return {
+    id: 'guest-cart',
+    userId: null,
+    items: nextItems,
+    subtotal: nextItems.reduce((sum, item) => sum + Number(item.lineTotal), 0).toFixed(2),
+  };
+}
 const invoiceSeller = {
   name: import.meta.env.VITE_INVOICE_SELLER_NAME || 'SupplySense',
   address: import.meta.env.VITE_INVOICE_SELLER_ADDRESS || 'Seller address not configured',
@@ -515,7 +535,7 @@ function CustomerPortal({ user, logout, openLogin }) {
   const [catalogMeta, setCatalogMeta] = useState({ page: 1, totalPages: 1, totalItems: 0 });
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [categories, setCategories] = useState([]);
-  const [cart, setCart] = useState(null);
+  const [cart, setCart] = useState(() => user ? null : readGuestCart());
   const [orders, setOrders] = useState([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
@@ -564,9 +584,24 @@ function CustomerPortal({ user, logout, openLogin }) {
     try {
       const c = await api('/categories');
       setCategories(c || []);
-      if (!user) return;
+      if (!user) {
+        setCart(readGuestCart());
+        setOrders([]);
+        return;
+      }
       const [crt, o] = await Promise.all([api('/cart'), api('/orders?pageSize=20')]);
-      setCart(crt);
+      const guestCart = readGuestCart();
+      let accountCart = crt;
+      if (guestCart.items.length) {
+        for (const item of guestCart.items) {
+          accountCart = await api('/cart', {
+            method: 'POST',
+            body: JSON.stringify({ variantId: item.variant.id, quantity: item.quantity }),
+          });
+        }
+        localStorage.removeItem(guestCartKey);
+      }
+      setCart(accountCart);
       setOrders(o || []);
     } catch (err) {
       setError(err.message);
@@ -708,7 +743,36 @@ function CustomerPortal({ user, logout, openLogin }) {
   };
 
   const updateCart = async (variantId, quantity, add = false) => {
-    if (!user) return openLogin('customer');
+    if (!user) {
+      const product = products.find((item) => item.variants.some((variant) => variant.id === variantId))
+        ?? (selectedProduct?.variants.some((variant) => variant.id === variantId) ? selectedProduct : null);
+      const variant = product?.variants.find((item) => item.id === variantId);
+      if (!variant || !product) return setError('This item is no longer available. Refresh the products and try again.');
+      const currentCart = readGuestCart();
+      const current = currentCart.items.find((item) => item.variant.id === variantId);
+      const nextQuantity = add ? (current?.quantity ?? 0) + quantity : quantity;
+      if (nextQuantity > 1000 || nextQuantity > variant.availableQuantity) {
+        return setError(`Only ${variant.availableQuantity} of this item are available.`);
+      }
+      const nextItems = currentCart.items.filter((item) => item.variant.id !== variantId);
+      if (nextQuantity > 0) {
+        nextItems.push({
+          id: `guest-${variantId}`,
+          quantity: nextQuantity,
+          variant: {
+            ...variant,
+            price: String(variant.price),
+            product: { ...product, variants: undefined },
+          },
+        });
+      }
+      const nextCart = makeGuestCart(nextItems);
+      localStorage.setItem(guestCartKey, JSON.stringify(nextCart));
+      setCart(nextCart);
+      setError('');
+      if (add) setNotice('Item added to your cart. Your cart is saved on this device.');
+      return;
+    }
     try {
       setBusy(true);
       setError('');
@@ -725,7 +789,12 @@ function CustomerPortal({ user, logout, openLogin }) {
   };
 
   const removeFromCart = async (variantId) => {
-    if (!user) return openLogin('customer');
+    if (!user) {
+      const nextCart = makeGuestCart(readGuestCart().items.filter((item) => item.variant.id !== variantId));
+      localStorage.setItem(guestCartKey, JSON.stringify(nextCart));
+      setCart(nextCart);
+      return;
+    }
     try {
       setBusy(true);
       setError('');
@@ -739,7 +808,13 @@ function CustomerPortal({ user, logout, openLogin }) {
   };
 
   const clearCart = async () => {
-    if (!user) return openLogin('customer');
+    if (!user) {
+      const nextCart = makeGuestCart([]);
+      localStorage.setItem(guestCartKey, JSON.stringify(nextCart));
+      setCart(nextCart);
+      setNotice('Your cart is now empty.');
+      return;
+    }
     try {
       setBusy(true);
       setError('');
@@ -1113,9 +1188,6 @@ function CustomerPortal({ user, logout, openLogin }) {
             <h1>Shopping cart</h1>
             <p className="cart-intro">Review your picks and make them yours.</p>
             <div className="cart-card page-card">
-              {!user ? (
-                <div className="cart-empty"><span aria-hidden="true">🛍️</span><h2>Your bag is ready when you are</h2><p>Sign in or create a free account to save items and check out.</p><button className="button button-primary" onClick={() => openLogin('customer', 'register')}>Create account</button></div>
-              ) : <>
               {!!count && <div className="cart-heading">
                 <span>Product</span>
                 <span>Quantity</span>
@@ -1148,6 +1220,7 @@ function CustomerPortal({ user, logout, openLogin }) {
                 </div>
               ))}
               {!count && <div className="cart-empty"><span aria-hidden="true">🛍️</span><h2>Your bag is waiting</h2><p>Browse the collection and add something you love.</p><button className="button button-primary" onClick={() => navigate('shop')}>Explore the shop</button></div>}
+              {!user && !!count && <p className="cart-intro">Your cart is saved on this device. Sign in when you’re ready to check out.</p>}
               {!!count && <div className="cart-total">
                 <span>Shipping</span><span className="shipping-note">Calculated at checkout</span>
               </div>}
@@ -1161,7 +1234,6 @@ function CustomerPortal({ user, logout, openLogin }) {
                   <button className="button button-primary page-action" onClick={() => navigate('checkout')}>Continue to checkout <span aria-hidden="true">→</span></button>
                 </div>
               )}
-              </>}
             </div>
           </section>
         )}
