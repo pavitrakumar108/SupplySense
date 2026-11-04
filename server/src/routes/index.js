@@ -9,6 +9,7 @@ import { createOrderRouter } from './order.routes.js';
 import { createPaymentRouter } from './payment.routes.js';
 import { createSupplyRouter } from './supply.routes.js';
 import { createUsersRouter } from './users.routes.js';
+import { createFeedbackRouter } from './feedback.routes.js';
 import { createWarehouseRouter } from './warehouse.routes.js';
 
 export function createApiRouter({ db }) {
@@ -16,6 +17,7 @@ export function createApiRouter({ db }) {
   router.use('/health', createHealthRouter({ db }));
   router.use('/auth', createAuthRouter({ db }));
   router.use('/users', createUsersRouter({ db }));
+  router.use('/feedback', createFeedbackRouter({ db }));
   router.use('/', createCatalogRouter({ db }));
   router.use('/', createCommerceRouter({ db }));
   router.use('/', createOrderRouter({ db }));

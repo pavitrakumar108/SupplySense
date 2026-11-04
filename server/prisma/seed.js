@@ -180,17 +180,48 @@ async function main() {
   }
 
   await upsertDemoUser({
-    email: 'customer@supplysense.local',
-    fullName: 'SupplySense Customer',
-    password: process.env.SEED_CUSTOMER_PASSWORD ?? 'Customer!12345',
-    roleCode: 'CUSTOMER',
+    email: 'admin2@supplysense.local',
+    fullName: 'SupplySense Admin 2',
+    password: process.env.SEED_ADMIN_2_PASSWORD ?? 'ChangeMe!12345',
+    roleCode: 'ADMIN',
   });
+  await upsertDemoUser({
+    email: 'admin3@supplysense.local',
+    fullName: 'SupplySense Admin 3',
+    password: process.env.SEED_ADMIN_3_PASSWORD ?? 'ChangeMe!12345',
+    roleCode: 'ADMIN',
+  });
+
+  if (process.env.NODE_ENV === 'production') {
+    const demoCustomer = await prisma.user.findUnique({ where: { email: 'customer@supplysense.local' }, select: { id: true } });
+    if (demoCustomer) {
+      const now = new Date();
+      await prisma.$transaction([
+        prisma.user.update({ where: { id: demoCustomer.id }, data: { isActive: false, emailVerifiedAt: null } }),
+        prisma.refreshToken.updateMany({ where: { userId: demoCustomer.id, revokedAt: null }, data: { revokedAt: now } }),
+        prisma.emailVerification.updateMany({ where: { userId: demoCustomer.id, consumedAt: null }, data: { consumedAt: now } }),
+      ]);
+    }
+  } else {
+    await upsertDemoUser({
+      email: 'customer@supplysense.local',
+      fullName: 'SupplySense Customer',
+      password: process.env.SEED_CUSTOMER_PASSWORD ?? 'Customer!12345',
+      roleCode: 'CUSTOMER',
+    });
+  }
   const manager = await upsertDemoUser({
     email: 'manager@supplysense.local',
     fullName: 'SupplySense Warehouse Manager',
     password: process.env.SEED_MANAGER_PASSWORD ?? 'Manager!12345',
     roleCode: 'WAREHOUSE_MANAGER',
   });
+  const additionalManagers = await Promise.all([2, 3].map((number) => upsertDemoUser({
+    email: `manager${number}@supplysense.local`,
+    fullName: `SupplySense Manager ${number}`,
+    password: process.env[`SEED_MANAGER_${number}_PASSWORD`] ?? 'ChangeMe!12345',
+    roleCode: 'WAREHOUSE_MANAGER',
+  })));
   await upsertDemoUser({
     email: 'auditor@supplysense.local',
     fullName: 'SupplySense Auditor',
@@ -404,11 +435,13 @@ async function main() {
   }
 
   for (const warehouse of warehouses) {
-    await prisma.managerWarehouse.upsert({
-      where: { managerId_warehouseId: { managerId: manager.id, warehouseId: warehouse.id } },
-      update: {},
-      create: { managerId: manager.id, warehouseId: warehouse.id },
-    });
+    for (const scopedManager of [manager, ...additionalManagers]) {
+      await prisma.managerWarehouse.upsert({
+        where: { managerId_warehouseId: { managerId: scopedManager.id, warehouseId: warehouse.id } },
+        update: {},
+        create: { managerId: scopedManager.id, warehouseId: warehouse.id },
+      });
+    }
   }
 
   const supplier = await prisma.supplier.upsert({

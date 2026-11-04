@@ -28,12 +28,14 @@
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "express-rate-limit": "^7.5.0",
+    "google-auth-library": "^11.3.3",
     "helmet": "^8.1.0",
+    "nodemailer": "^10.3.1",
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",
     "zod": "^3.25.0"
   },
   "devDependencies": {
-    "prisma": "^6.0.0"
+    "prisma": "^6.19.3"
   }
 }

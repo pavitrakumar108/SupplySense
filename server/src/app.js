@@ -32,6 +32,9 @@ export function createApp({ db } = {}) {
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
+        scriptSrc: ["'self'", 'https://accounts.google.com'],
+        connectSrc: ["'self'", 'https://accounts.google.com'],
+        frameSrc: ['https://accounts.google.com'],
         imgSrc: ["'self'", 'data:', 'https://rukminim2.flixcart.com', 'https://m.media-amazon.com', 'https://assets.myntassets.com', 'https://images-static.nykaa.com'],
       },
     },

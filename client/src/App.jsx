@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import productPhotoManifest from './product-photo-manifest.json';
 
 async function apiEnvelope(path, options = {}) {
@@ -36,11 +36,27 @@ const money = (value) => `₹${Number(value ?? 0).toLocaleString('en-IN', { mini
 const roleCodes = (user) => user?.roles?.map((role) => role.code) ?? [];
 const cardOfferDiscount = (subtotal) => Math.min(Math.round(Number(subtotal ?? 0) * 10) / 100, 500);
 const guestCartKey = 'supplysense_guest_cart';
+const guestWishlistKey = 'supplysense_guest_wishlist';
+const customerPages = new Set(['shop', 'wishlist', 'cart', 'checkout', 'orders', 'about', 'faq', 'shipping', 'terms', 'feedback']);
+function pageFromHash() {
+  const route = location.hash.replace(/^#\/?/, '').split('?')[0].replace(/\/+$/, '');
+  if (route) return route;
+  return location.pathname.replace(/^\/+|\/+$/g, '') || 'shop';
+}
 function readGuestCart() {
   try {
-    return JSON.parse(localStorage.getItem(guestCartKey) || 'null') ?? { id: 'guest-cart', userId: null, items: [], subtotal: 0 };
+    const saved = JSON.parse(localStorage.getItem(guestCartKey) || 'null');
+    return saved && Array.isArray(saved.items) ? saved : { id: 'guest-cart', userId: null, items: [], subtotal: 0 };
   } catch {
     return { id: 'guest-cart', userId: null, items: [], subtotal: 0 };
+  }
+}
+function readGuestWishlist() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(guestWishlistKey) || '[]');
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
   }
 }
 function makeGuestCart(items) {
@@ -63,27 +79,116 @@ const invoiceSeller = {
   email: import.meta.env.VITE_INVOICE_SELLER_EMAIL || 'support@supplysense.com',
 };
 
+function GoogleSignIn({ clientId, onCredential }) {
+  const container = useRef(null);
+  const callback = useRef(onCredential);
+  callback.current = onCredential;
+
+  useEffect(() => {
+    if (!clientId || !container.current) return undefined;
+    let script = document.querySelector('script[data-google-identity]');
+    const initialize = () => {
+      if (!window.google?.accounts?.id || !container.current) return;
+      container.current.replaceChildren();
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: ({ credential }) => callback.current(credential),
+      });
+      window.google.accounts.id.renderButton(container.current, { theme: 'outline', size: 'large', shape: 'rectangular', width: 280, text: 'continue_with' });
+    };
+    if (window.google?.accounts?.id) initialize();
+    else {
+      if (!script) {
+        script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.dataset.googleIdentity = 'true';
+        document.head.append(script);
+      }
+      script.addEventListener('load', initialize);
+    }
+    return () => script?.removeEventListener('load', initialize);
+  }, [clientId]);
+
+  return <div className="google-signin" ref={container} />;
+}
+
 function Gate({ login, onBack, initialRole = 'customer', initialMode = 'login' }) {
   const [role, setRole] = useState(initialRole);
   const [mode, setMode] = useState(initialMode);
   const [form, setForm] = useState({ fullName: '', email: '', password: '' });
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
   const [busy, setBusy] = useState(false);
   const register = mode === 'register';
+  const verifying = mode === 'verify';
+
+  const verifyWithGoogle = async (credential) => {
+    setBusy(true);
+    setError('');
+    try {
+      login(await api('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submit = async (event) => {
     event.preventDefault();
     setBusy(true);
     setError('');
+    setNotice('');
     try {
+      if (verifying) {
+        login(await api('/auth/verify-email', {
+          method: 'POST',
+          body: JSON.stringify({ email: verificationEmail, code: verificationCode }),
+        }));
+        return;
+      }
       const data = await api(register ? '/auth/register' : role === 'admin' ? '/auth/login' : `/auth/${role}/login`, {
         method: 'POST',
         body: JSON.stringify(form),
       });
+      if (register && data.verificationRequired) {
+        setVerificationEmail(data.email);
+        setVerificationCode('');
+        setMode('verify');
+        setNotice(`Enter the 6-digit code sent to ${data.email}.`);
+        return;
+      }
       if (role === 'admin' && !roleCodes(data.user).includes('ADMIN')) {
         throw new Error('This account does not have admin access.');
       }
       login(data);
+    } catch (err) {
+      if (err.code === 'EMAIL_NOT_VERIFIED') {
+        setVerificationEmail(form.email.trim().toLowerCase());
+        setMode('verify');
+        setNotice('Verify your email address to finish signing in.');
+        return;
+      }
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const result = await api('/auth/verification/resend', {
+        method: 'POST',
+        body: JSON.stringify({ email: verificationEmail }),
+      });
+      setNotice(result.message || 'If this address needs verification, a new code has been sent.');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -94,7 +199,7 @@ function Gate({ login, onBack, initialRole = 'customer', initialMode = 'login' }
   return (
     <main className="gate-shell">
       <section className="gate-intro">
-        <a className="brand" href="/"><span className="brand-mark">S</span>SupplySense</a>
+        <a className="brand" href="/"><span className="brand-mark" aria-hidden="true">✦</span>SupplySense</a>
         {onBack && <button className="link-button gate-back" onClick={onBack}>← Back to the shop</button>}
         <div>
           <p className="eyebrow">CONNECTED OPERATIONS</p>
@@ -120,19 +225,34 @@ function Gate({ login, onBack, initialRole = 'customer', initialMode = 'login' }
             <strong>Admin</strong><span>User accounts & controls</span>
           </button>
         </div>
-        <h2>{register ? 'Create customer account' : `${role === 'admin' ? 'Admin' : role === 'manager' ? 'Manager' : 'Customer'} login`}</h2>
+        <h2>{verifying ? 'Verify your email' : register ? 'Create customer account' : `${role === 'admin' ? 'Admin' : role === 'manager' ? 'Manager' : 'Customer'} login`}</h2>
         <form className="gate-form" onSubmit={submit}>
-          {register && (
+          {verifying ? (
+            <>
+              <p className="verify-copy">Enter the 6-digit code we emailed to <strong>{verificationEmail}</strong>.</p>
+              <label>Verification code<input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength="6" required value={verificationCode} onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))} /></label>
+            </>
+          ) : register && (
             <label>Full name<input required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} /></label>
           )}
-          <label>Email address<input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
-          <label>Password<input type="password" minLength="12" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>
+          {!verifying && <>
+            <label>Email address<input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
+            <label>Password<input type="password" minLength="12" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>
+          </>}
           <button className="button button-primary" disabled={busy}>
-            {busy ? 'Please wait…' : register ? 'Create account' : `Open ${role} workspace`}
+            {busy ? 'Please wait…' : verifying ? 'Verify email' : register ? 'Create account' : `Open ${role} workspace`}
           </button>
         </form>
         {error && <p className="form-error">{error}</p>}
-        {role === 'customer' && (
+        {notice && <p className="form-success" role="status">{notice}</p>}
+        {verifying && <button className="link-button" disabled={busy} onClick={resendVerification}>Send a new code</button>}
+        {!verifying && role === 'customer' && import.meta.env.VITE_GOOGLE_CLIENT_ID && (
+          <>
+            <p className="oauth-divider">or continue with</p>
+            <GoogleSignIn clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID} onCredential={verifyWithGoogle} />
+          </>
+        )}
+        {!verifying && role === 'customer' && (
           <button className="link-button" onClick={() => setMode(register ? 'login' : 'register')}>
             {register ? 'Already have an account? Sign in' : 'New customer? Create account'}
           </button>
@@ -149,6 +269,8 @@ function Manager({ user, logout }) {
   const [users, setUsers] = useState([]);
   const [registeredUserCount, setRegisteredUserCount] = useState(0);
   const [usersLoaded, setUsersLoaded] = useState(false);
+  const [feedback, setFeedback] = useState([]);
+  const [unresolvedFeedbackCount, setUnresolvedFeedbackCount] = useState(0);
   const [data, setData] = useState({ dashboard: null, inventory: [], recommendations: [], forecasts: [], anomalies: [] });
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -164,13 +286,71 @@ function Manager({ user, logout }) {
         Array.from({ length: Math.max(0, pages - 1) }, (_, index) => api(`/users?page=${index + 2}&pageSize=100`)),
       );
       const allUsers = [...(firstPage.data ?? []), ...remainingPages.flat()];
-      setUsers(allUsers.filter((account) => account.isActive));
+      setUsers(allUsers);
       setRegisteredUserCount(firstPage.meta?.totalItems ?? allUsers.length);
       setUsersLoaded(true);
     } catch (err) {
       setError(err.message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const discardAccount = async (account) => {
+    if (!window.confirm(`Discard ${account.email}? Their sign-in sessions will be revoked.`)) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await api(`/users/${account.id}/discard`, { method: 'POST', body: '{}' });
+      setNotice(`${account.email} was discarded. Their account history is retained.`);
+      await loadUsers();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const requireVerification = async (account) => {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await api(`/users/${account.id}/require-verification`, { method: 'POST', body: '{}' });
+      setNotice(`A new verification code was emailed to ${account.email}.`);
+      await loadUsers();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const loadFeedback = async () => {
+    try {
+      setBusy(true);
+      setError('');
+      const firstPage = await apiEnvelope('/feedback?page=1&pageSize=100');
+      const pages = firstPage.meta?.totalPages ?? 1;
+      const remainingPages = await Promise.all(
+        Array.from({ length: Math.max(0, pages - 1) }, (_, index) => api(`/feedback?page=${index + 2}&pageSize=100`)),
+      );
+      setFeedback([...(firstPage.data ?? []), ...remainingPages.flat()]);
+      setUnresolvedFeedbackCount(firstPage.meta?.unresolvedCount ?? 0);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const updateFeedbackStatus = async (item) => {
+    try {
+      await api(`/feedback/${item.id}`, { method: 'PATCH', body: JSON.stringify({ isResolved: !item.isResolved }) });
+      await loadFeedback();
+    } catch (err) {
+      setError(err.message);
     }
   };
 
@@ -236,7 +416,7 @@ function Manager({ user, logout }) {
   return (
     <div className="manager-shell">
       <aside className="manager-sidebar">
-        <a className="brand" href="#"><span className="brand-mark">S</span>SupplySense</a>
+        <a className="brand" href="/#/shop"><span className="brand-mark" aria-hidden="true">✦</span>SupplySense</a>
         <p className="sidebar-label">MANAGER WORKSPACE</p>
         {[
           ['dashboard', 'Warehouse Overview'],
@@ -244,8 +424,9 @@ function Manager({ user, logout }) {
           ['demand', 'Demand Prediction'],
           ['suppliers', 'Supplier Management'],
           ...(roleCodes(user).includes('ADMIN') ? [['users', 'User Accounts']] : []),
+          ...(roleCodes(user).includes('ADMIN') ? [['feedback', 'Customer Feedback']] : []),
         ].map(([id, title]) => (
-          <button key={id} className={view === id ? 'active' : ''} onClick={() => { setView(id); if (id === 'users') loadUsers(); }}>
+          <button key={id} className={view === id ? 'active' : ''} onClick={() => { setView(id); if (id === 'users') loadUsers(); if (id === 'feedback') loadFeedback(); }}>
             {title}
           </button>
         ))}
@@ -259,13 +440,13 @@ function Manager({ user, logout }) {
         <header className="manager-header">
           <div>
             <p className="eyebrow">OPERATIONS CONTROL</p>
-            <h1>{view === 'dashboard' ? 'Warehouse Overview' : view === 'inventory' ? 'Product Distribution' : view === 'suppliers' ? 'Supplier Management' : view === 'users' ? 'User Accounts' : 'Demand Prediction'}</h1>
+            <h1>{view === 'dashboard' ? 'Warehouse Overview' : view === 'inventory' ? 'Product Distribution' : view === 'suppliers' ? 'Supplier Management' : view === 'users' ? 'User Accounts' : view === 'feedback' ? 'Customer Feedback' : 'Demand Prediction'}</h1>
           </div>
           <div>
-            {view !== 'users' && <select value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); load(e.target.value); }}>
+            {!['users', 'feedback'].includes(view) && <select value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); load(e.target.value); }}>
               {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name} ({w.code})</option>)}
             </select>}
-            <button className="button button-secondary" disabled={busy} onClick={() => view === 'users' ? loadUsers() : load()}>{busy ? 'Loading…' : 'Refresh Data'}</button>
+            <button className="button button-secondary" disabled={busy} onClick={() => view === 'users' ? loadUsers() : view === 'feedback' ? loadFeedback() : load()}>{busy ? 'Loading…' : 'Refresh Data'}</button>
           </div>
         </header>
 
@@ -353,14 +534,14 @@ function Manager({ user, logout }) {
           <>
             <div className="manager-metrics">
               <article><span>Registered Accounts</span><strong>{usersLoaded ? registeredUserCount : '—'}</strong></article>
-              <article><span>Active Accounts</span><strong>{usersLoaded ? users.length : '—'}</strong></article>
+              <article><span>Active Accounts</span><strong>{usersLoaded ? users.filter((account) => account.isActive).length : '—'}</strong></article>
             </div>
             <section className="manager-card">
               <p className="eyebrow">ACCOUNT DIRECTORY</p>
-              <h2>Active users</h2>
+              <h2>All users</h2>
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Name</th><th>Email</th><th>Roles</th><th>Registered</th><th>Status</th></tr></thead>
+                  <thead><tr><th>Name</th><th>Email</th><th>Roles</th><th>Registered</th><th>Status</th><th>Admin actions</th></tr></thead>
                   <tbody>
                     {users.map((account) => (
                       <tr key={account.id}>
@@ -368,13 +549,48 @@ function Manager({ user, logout }) {
                         <td>{account.email}</td>
                         <td>{account.roles.map((role) => role.name).join(', ') || '—'}</td>
                         <td>{new Date(account.createdAt).toLocaleDateString()}</td>
-                        <td><span className="status-chip">Active</span></td>
+                        <td><span className="status-chip">{!account.isActive ? 'Discarded' : !account.emailVerifiedAt && account.roles.some((role) => role.code === 'CUSTOMER') ? 'Needs verification' : 'Active'}</span></td>
+                        <td className="account-actions">
+                          {account.roles.some((role) => role.code === 'CUSTOMER') && <button className="table-action" disabled={busy} onClick={() => requireVerification(account)}>Require verification</button>}
+                          {account.isActive && account.id !== user.id && <button className="table-action table-action-danger" disabled={busy} onClick={() => discardAccount(account)}>Discard</button>}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              {usersLoaded && !users.length && <p className="empty-state">No active users found.</p>}
+              {usersLoaded && !users.length && <p className="empty-state">No users found.</p>}
+            </section>
+          </>
+        )}
+
+        {view === 'feedback' && (
+          <>
+            <div className="manager-metrics feedback-metrics">
+              <article><span>Total feedback</span><strong>{feedback.length}</strong></article>
+              <article><span>Needs review</span><strong>{unresolvedFeedbackCount}</strong></article>
+            </div>
+            <section className="manager-card">
+              <p className="eyebrow">CUSTOMER VOICE</p>
+              <h2>Website feedback</h2>
+              <div className="table-wrap">
+                <table className="feedback-table">
+                  <thead><tr><th>Received</th><th>Customer</th><th>Rating</th><th>Feedback</th><th>Status</th><th>Action</th></tr></thead>
+                  <tbody>
+                    {feedback.map((item) => (
+                      <tr key={item.id}>
+                        <td>{new Date(item.createdAt).toLocaleString()}</td>
+                        <td><strong>{item.name}</strong><small>{item.email}</small></td>
+                        <td>{item.rating ? `${item.rating} / 5` : '—'}</td>
+                        <td><strong>{item.subject}</strong><small className="feedback-message-preview">{item.message}</small></td>
+                        <td><span className={`status-chip ${item.isResolved ? 'resolved' : 'pending'}`}>{item.isResolved ? 'Reviewed' : 'New'}</span></td>
+                        <td><button className="table-action" onClick={() => updateFeedbackStatus(item)}>{item.isResolved ? 'Reopen' : 'Mark reviewed'}</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {!feedback.length && <p className="empty-state">No customer feedback has been received yet.</p>}
             </section>
           </>
         )}
@@ -507,7 +723,7 @@ function InvoiceDocument({ order, onClose }) {
       </div>
       <article className="invoice-paper" aria-label="Order bill">
         <header className="invoice-header">
-          <div><span className="invoice-brand-mark">S</span><div><strong>{invoiceSeller.name}</strong><small>Order bill</small></div></div>
+          <div><span className="invoice-brand-mark" aria-hidden="true">✦</span><div><strong>{invoiceSeller.name}</strong><small>Order bill</small></div></div>
           <div className="invoice-title"><p>ORDER BILL</p><h1>Purchase summary</h1><span>Bill reference {invoiceRef}</span></div>
         </header>
         <div className="invoice-notice">Order bill / payment receipt — GST registration and product tax details are not configured for this demo.</div>
@@ -536,6 +752,7 @@ function CustomerPortal({ user, logout, openLogin }) {
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [categories, setCategories] = useState([]);
   const [cart, setCart] = useState(() => user ? null : readGuestCart());
+  const [wishlist, setWishlist] = useState(() => user ? [] : readGuestWishlist());
   const [orders, setOrders] = useState([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
@@ -560,7 +777,9 @@ function CustomerPortal({ user, logout, openLogin }) {
   });
   const [payment, setPayment] = useState('upi');
   const [cardForm, setCardForm] = useState({ name: user?.fullName ?? '', number: '4242 •••• •••• 4242', exp: '12/28', cvv: '123' });
-  const [page, setPage] = useState(() => location.hash.replace('#/', '') || 'shop');
+  const [page, setPage] = useState(pageFromHash);
+  const [feedbackForm, setFeedbackForm] = useState({ name: user?.fullName ?? '', email: user?.email ?? '', subject: '', message: '', rating: '' });
+  const [feedbackSent, setFeedbackSent] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -586,22 +805,40 @@ function CustomerPortal({ user, logout, openLogin }) {
       setCategories(c || []);
       if (!user) {
         setCart(readGuestCart());
+        setWishlist(readGuestWishlist());
         setOrders([]);
         return;
       }
-      const [crt, o] = await Promise.all([api('/cart'), api('/orders?pageSize=20')]);
+      const [crt, o, savedWishlist] = await Promise.all([api('/cart'), api('/orders?pageSize=20'), api('/wishlist')]);
       const guestCart = readGuestCart();
       let accountCart = crt;
+      setCart(crt);
       if (guestCart.items.length) {
+        const pendingCartItems = [...guestCart.items];
         for (const item of guestCart.items) {
           accountCart = await api('/cart', {
             method: 'POST',
             body: JSON.stringify({ variantId: item.variant.id, quantity: item.quantity }),
           });
+          pendingCartItems.shift();
+          if (pendingCartItems.length) localStorage.setItem(guestCartKey, JSON.stringify(makeGuestCart(pendingCartItems)));
+          else localStorage.removeItem(guestCartKey);
+          setCart(accountCart);
         }
-        localStorage.removeItem(guestCartKey);
+      }
+      const guestWishlist = readGuestWishlist();
+      let accountWishlist = savedWishlist.items ?? [];
+      if (guestWishlist.length) {
+        for (const item of guestWishlist) {
+          accountWishlist = (await api('/wishlist', {
+            method: 'POST',
+            body: JSON.stringify({ variantId: item.variant.id }),
+          })).items;
+        }
+        localStorage.removeItem(guestWishlistKey);
       }
       setCart(accountCart);
+      setWishlist(accountWishlist);
       setOrders(o || []);
     } catch (err) {
       setError(err.message);
@@ -610,7 +847,7 @@ function CustomerPortal({ user, logout, openLogin }) {
 
   useEffect(() => {
     load();
-    const sync = () => setPage(location.hash.replace('#/', '') || 'shop');
+    const sync = () => setPage(pageFromHash());
     addEventListener('hashchange', sync);
     return () => removeEventListener('hashchange', sync);
   }, []);
@@ -723,6 +960,7 @@ function CustomerPortal({ user, logout, openLogin }) {
   }, [products, categories, category, brandFilter, minPrice, maxPrice, variantOption, failedProductIds]);
 
   const count = cart?.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+  const wishlistCount = wishlist.length;
   const cardDiscount = payment === 'card' ? cardOfferDiscount(cart?.subtotal) : 0;
   const checkoutTotal = Math.max(0, Number(cart?.subtotal ?? 0) - cardDiscount);
   const detailVariant = selectedProduct?.variants.find((variant) => variant.id === selectedVariantId);
@@ -740,6 +978,57 @@ function CustomerPortal({ user, logout, openLogin }) {
   const openProduct = (product, variantId) => {
     setSelectedProduct(product);
     setSelectedVariantId(variantId ?? product.variants[0]?.id ?? '');
+  };
+
+  const toggleWishlist = async (product, variant) => {
+    if (!product || !variant) return;
+    try {
+      setError('');
+      const saved = wishlist.some((item) => item.variant.id === variant.id);
+      if (user) {
+        await api('/wishlist', {
+          method: saved ? 'DELETE' : 'POST',
+          body: JSON.stringify({ variantId: variant.id }),
+        });
+        const result = await api('/wishlist');
+        setWishlist(result.items ?? []);
+      } else {
+        const current = readGuestWishlist();
+        const next = saved
+          ? current.filter((item) => item.variant.id !== variant.id)
+          : [...current, {
+            id: `guest-${variant.id}`,
+            variant: { ...variant, price: String(variant.price), product: { ...product, variants: undefined } },
+          }];
+        localStorage.setItem(guestWishlistKey, JSON.stringify(next));
+        setWishlist(next);
+      }
+      setNotice(saved ? 'Removed from your wishlist.' : 'Saved to your wishlist.');
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const submitFeedback = async (event) => {
+    event.preventDefault();
+    try {
+      setBusy(true);
+      setError('');
+      await api('/feedback', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...feedbackForm,
+          subject: feedbackForm.subject.trim() || 'Website feedback',
+          rating: feedbackForm.rating ? Number(feedbackForm.rating) : undefined,
+        }),
+      });
+      setFeedbackSent(true);
+      setFeedbackForm((current) => ({ ...current, subject: '', message: '', rating: '' }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const updateCart = async (variantId, quantity, add = false) => {
@@ -943,10 +1232,11 @@ function CustomerPortal({ user, logout, openLogin }) {
     <div className="customer-portal">
       <header className="portal-header">
         <div className="header-brand">
-          <a className="brand" href="#"><span className="brand-mark">S</span>SupplySense</a>
+          <a className="brand" href="/#/shop"><span className="brand-mark" aria-hidden="true">✦</span>SupplySense</a>
           <nav className="header-nav">
             <button className={page === 'shop' ? 'active' : ''} onClick={() => navigate('shop')}>Shop</button>
             <button className={page === 'cart' ? 'active' : ''} onClick={() => navigate('cart')}>Cart ({count})</button>
+            <button className={page === 'wishlist' ? 'active' : ''} onClick={() => navigate('wishlist')}>Wishlist ({wishlistCount})</button>
             <button className={page === 'orders' ? 'active' : ''} onClick={() => navigate('orders')}>Orders</button>
           </nav>
         </div>
@@ -1118,6 +1408,9 @@ function CustomerPortal({ user, logout, openLogin }) {
                           <span className={variant.inStock ? 'stock in-stock' : 'stock'}>{variant.inStock ? `${variant.availableQuantity} available` : 'Out of stock'}</span>
                         </div>
                         <button className="button button-primary add-button" disabled={!variant.inStock || busy} onClick={() => updateCart(variant.id, 1, true)}>Add to cart</button>
+                        <button className="wishlist-toggle" aria-label={wishlist.some((item) => item.variant.id === variant.id) ? 'Remove from wishlist' : 'Add to wishlist'} onClick={() => toggleWishlist(product, variant)}>
+                          {wishlist.some((item) => item.variant.id === variant.id) ? '♥ Saved' : '♡ Wishlist'}
+                        </button>
                       </div>
                     </article>
                   );
@@ -1173,6 +1466,9 @@ function CustomerPortal({ user, logout, openLogin }) {
                         >
                           Add to cart {detailVariant ? `· ${money(detailVariant.price)}` : ''}
                         </button>
+                        <button className="wishlist-toggle detail-wishlist-toggle" onClick={() => toggleWishlist(selectedProduct, detailVariant)}>
+                          {wishlist.some((item) => item.variant.id === detailVariant?.id) ? '♥ Remove from wishlist' : '♡ Add to wishlist'}
+                        </button>
                       </div>
                     </div>
                   </section>
@@ -1180,6 +1476,38 @@ function CustomerPortal({ user, logout, openLogin }) {
               )}
             </section>
           </>
+        )}
+
+        {page === 'wishlist' && (
+          <section className="customer-page wishlist-page">
+            <p className="eyebrow">SAVED FOR LATER</p>
+            <h1>Your wishlist</h1>
+            {wishlist.length ? (
+              <div className="wishlist-list">
+                {wishlist.map((item) => {
+                  const variant = item.variant;
+                  const product = variant.product;
+                  return (
+                    <article className="wishlist-row" key={item.id}>
+                      <ProductImage imageUrl={variant.images?.[0]?.imageUrl ?? product.images?.[0]?.imageUrl} productName={product.name} categorySlug={product.category?.slug} alt={displayProductName(product.name, product.category?.slug)} className="wishlist-image" />
+                      <div className="wishlist-copy">
+                        <span className="product-category">{product.category?.name}</span>
+                        <strong>{displayProductName(product.name, product.category?.slug)}</strong>
+                        <small>{variant.attributes?.option}</small>
+                        <strong>{money(variant.price)}</strong>
+                      </div>
+                      <div className="wishlist-actions">
+                        <button className="button button-primary" disabled={!variant.inStock || busy} onClick={() => updateCart(variant.id, 1, true)}>Add to cart</button>
+                        <button className="link-button" onClick={() => toggleWishlist(product, variant)}>Remove</button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="page-card empty-state">Your wishlist is empty. Save items from the shop and they’ll appear here.<button className="button button-primary" onClick={() => navigate('shop')}>Browse products</button></div>
+            )}
+          </section>
         )}
 
         {page === 'cart' && (
@@ -1377,12 +1705,49 @@ function CustomerPortal({ user, logout, openLogin }) {
             </div>
           </section>
         )}
+
+        {page === 'feedback' && (
+          <section className="customer-page feedback-page">
+            <p className="eyebrow">HELP US IMPROVE</p>
+            <h1>Share your feedback</h1>
+            {feedbackSent ? (
+              <div className="page-card feedback-thanks" role="status">
+                <h2>Thank you for helping us improve.</h2>
+                <p>Your feedback has been sent to the SupplySense team.</p>
+                <button className="button button-secondary" onClick={() => setFeedbackSent(false)}>Send more feedback</button>
+              </div>
+            ) : (
+              <form className="page-card feedback-form" onSubmit={submitFeedback}>
+                <p>Tell us what worked well or what we should fix. Our team will review your message.</p>
+                <div className="feedback-fields">
+                  <label>Your name<input required minLength="2" maxLength="160" value={feedbackForm.name} onChange={(e) => setFeedbackForm({ ...feedbackForm, name: e.target.value })} /></label>
+                  <label>Email address<input required type="email" value={feedbackForm.email} onChange={(e) => setFeedbackForm({ ...feedbackForm, email: e.target.value })} /></label>
+                  <label>Subject<input maxLength="160" placeholder="Website feedback" value={feedbackForm.subject} onChange={(e) => setFeedbackForm({ ...feedbackForm, subject: e.target.value })} /></label>
+                  <label>Rating (optional)<select value={feedbackForm.rating} onChange={(e) => setFeedbackForm({ ...feedbackForm, rating: e.target.value })}><option value="">Choose a rating</option><option value="5">5 · Great</option><option value="4">4 · Good</option><option value="3">3 · Okay</option><option value="2">2 · Poor</option><option value="1">1 · Very poor</option></select></label>
+                  <label className="feedback-message">Your feedback<textarea required minLength="5" maxLength="3000" rows="6" value={feedbackForm.message} onChange={(e) => setFeedbackForm({ ...feedbackForm, message: e.target.value })} /></label>
+                </div>
+                <button className="button button-primary" disabled={busy}>{busy ? 'Sending…' : 'Send feedback'}</button>
+              </form>
+            )}
+          </section>
+        )}
+
+        {!customerPages.has(page) && (
+          <section className="customer-page missing-page">
+            <div className="page-card empty-state">
+              <p className="eyebrow">404 · PAGE NOT FOUND</p>
+              <h1>We couldn’t find that page.</h1>
+              <p>The link may be outdated or the address may be incomplete.</p>
+              <button className="button button-primary" onClick={() => navigate('shop')}>Back to the shop</button>
+            </div>
+          </section>
+        )}
       </main>
 
       <footer className="portal-footer">
         <div className="footer-grid">
           <div className="footer-col">
-            <a className="brand" href="#"><span className="brand-mark">S</span>SupplySense</a>
+            <a className="brand" href="/#/shop"><span className="brand-mark" aria-hidden="true">✦</span>SupplySense</a>
             <p className="footer-desc">Your one-stop destination for all your supply needs. Quality, speed, and reliability.</p>
           </div>
           <div className="footer-col">
@@ -1393,6 +1758,7 @@ function CustomerPortal({ user, logout, openLogin }) {
               <li><button className="link-button" onClick={() => navigate('faq')}>FAQ</button></li>
               <li><button className="link-button" onClick={() => navigate('shipping')}>Shipping Policy</button></li>
               <li><button className="link-button" onClick={() => navigate('terms')}>Terms of Service</button></li>
+              <li><button className="link-button" onClick={() => navigate('feedback')}>Share feedback</button></li>
             </ul>
           </div>
           <div className="footer-col">

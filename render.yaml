@@ -27,16 +27,52 @@ services:
       - key: JWT_REFRESH_SECRET
         generateValue: true
 
+      - key: OTP_SECRET
+        generateValue: true
+
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
+
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+
+      - key: SMTP_PORT
+        value: "465"
+
+      - key: SMTP_SECURE
+        value: "true"
+
+      - key: SMTP_USER
+        sync: false
+
+      - key: SMTP_PASSWORD
+        sync: false
+
+      - key: EMAIL_FROM
+        sync: false
+
       - key: MOCK_PAYMENT_WEBHOOK_SECRET
         generateValue: true
 
       - key: SEED_ADMIN_PASSWORD
         generateValue: true
 
-      - key: SEED_CUSTOMER_PASSWORD
+      - key: SEED_MANAGER_PASSWORD
         generateValue: true
 
-      - key: SEED_MANAGER_PASSWORD
+      - key: SEED_ADMIN_2_PASSWORD
+        generateValue: true
+
+      - key: SEED_ADMIN_3_PASSWORD
+        generateValue: true
+
+      - key: SEED_MANAGER_2_PASSWORD
+        generateValue: true
+
+      - key: SEED_MANAGER_3_PASSWORD
         generateValue: true
 
       - key: SEED_AUDITOR_PASSWORD

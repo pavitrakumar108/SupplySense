@@ -101,6 +101,14 @@ Demo credentials are seeded locally: `admin@supplysense.local` / `ChangeMe!12345
 
 The local PostgreSQL data directory is the ignored `.local/postgres` directory on port `5433`. Use `npm run db:local:status`, `npm run db:status`, and `npm run db:local:stop` to inspect or stop it.
 
+### Email verification and Google sign-in
+
+New email/password accounts must verify a one-time code before they can sign in. Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, and `EMAIL_FROM` in `.env` to deliver codes. Signup is blocked until SMTP is configured; OTPs are never returned to the browser. Set a private random `OTP_SECRET` before deploying.
+
+To enable Google sign-in, create a Google OAuth web client, add the local and deployed site origins to its authorized JavaScript origins, then set its client ID as both `GOOGLE_CLIENT_ID` in the API environment and `VITE_GOOGLE_CLIENT_ID` in `client/.env.local`. The API verifies the Google ID token before creating a customer account. See Google's [ID token verification guide](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
+
+The email verification and feedback tables are added by the latest Prisma migration. Apply it with `npm run db:deploy` before starting an existing database.
+
 ## Run the complete local Docker stack
 
 If Docker Desktop is installed, the complete API, client, and PostgreSQL stack can run locally with:
@@ -122,8 +130,8 @@ The included [`render.yaml`](render.yaml) deploys the built React site and Expre
 1. Create a free PostgreSQL project in [Neon](https://neon.tech/) and copy its pooled connection string.
 2. Push this repository to GitHub.
 3. In [Render](https://render.com/), create a **Blueprint** from the GitHub repository and use the committed `render.yaml`.
-4. When Render prompts for `DATABASE_URL`, paste the Neon connection string. Render generates the JWT, webhook, and seeded-account passwords.
-5. After deployment, open the public `onrender.com` URL shown in Render. The seeded admin account is `admin@supplysense.local`; retrieve its generated password from the Render service's environment settings and keep it private.
+4. When Render prompts for `DATABASE_URL`, paste the Neon connection string. Also set `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, and `EMAIL_FROM` to your mail provider's values; for Gmail, use `smtp.gmail.com` and set `EMAIL_FROM` to the same Gmail sender address. Set `GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID` to the OAuth web client ID, and add the deployed HTTPS origin to that client's authorized JavaScript origins. Render generates the JWT, webhook, OTP, and six seeded-account passwords.
+5. After deployment, open the public `onrender.com` URL shown in Render. Admin IDs are `admin@supplysense.local`, `admin2@supplysense.local`, and `admin3@supplysense.local`; manager IDs are `manager@supplysense.local`, `manager2@supplysense.local`, and `manager3@supplysense.local`. Retrieve their generated passwords from the Render service's environment settings and keep them private.
 
 The free Render service sleeps after 15 minutes without traffic and may take about a minute to wake when someone visits. Free hosting is suitable for a demo, but not a reliable always-on store; Neon and Render free-plan quotas and retention limits also apply. The app currently uses mock payments, so checkout does not charge real cards.
 

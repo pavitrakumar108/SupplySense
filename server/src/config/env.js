@@ -25,6 +25,14 @@ const envSchema = z.object({
     .default('dev-only-refresh-secret-change-this-value-123456'),
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   JWT_REFRESH_TTL_SECONDS: z.coerce.number().int().positive().default(2592000),
+  OTP_SECRET: z.string().min(32).default('dev-only-email-otp-secret-change-this-123456'),
+  GOOGLE_CLIENT_ID: z.string().default(''),
+  SMTP_HOST: z.string().default(''),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+  SMTP_SECURE: z.string().default('false').transform((value) => value.toLowerCase() === 'true'),
+  SMTP_USER: z.string().default(''),
+  SMTP_PASSWORD: z.string().default(''),
+  EMAIL_FROM: z.string().default('SupplySense <no-reply@supplysense.com>'),
   RESERVATION_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   MOCK_PAYMENT_WEBHOOK_SECRET: z
     .string()
@@ -33,6 +41,17 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+}).superRefine((value, context) => {
+  if (value.NODE_ENV !== 'production') return;
+  for (const [key, label] of [
+    ['OTP_SECRET', 'OTP_SECRET'],
+    ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_ID'],
+    ['SMTP_HOST', 'SMTP_HOST'],
+  ]) {
+    if (!process.env[key]?.trim()) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: `${label} must be configured in production.` });
+    }
+  }
 });
 
 const parsed = envSchema.safeParse(process.env);

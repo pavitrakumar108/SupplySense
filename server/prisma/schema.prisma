@@ -102,7 +102,9 @@ enum AnomalyDirection {
 model User {
   id                    String              @id @default(uuid()) @db.Uuid
   email                 String              @unique @db.VarChar(320)
-  passwordHash          String              @map("password_hash")
+  passwordHash          String?             @map("password_hash")
+  googleSub             String?             @unique @map("google_sub") @db.VarChar(255)
+  emailVerifiedAt       DateTime?           @default(now()) @map("email_verified_at")
   fullName              String              @map("full_name") @db.VarChar(160)
   isActive              Boolean             @default(true) @map("is_active")
   createdAt             DateTime            @default(now()) @map("created_at")
@@ -120,6 +122,36 @@ model User {
   recommendationDecisions ReorderRecommendation[] @relation("RecommendationDecisionActor")
   supplierProfile       Supplier?           @relation("SupplierAccount")
   auditLogs             AuditLog[]          @relation("AuditActor")
+  emailVerifications    EmailVerification[]
+  feedback              CustomerFeedback[]
+}
+
+model EmailVerification {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  codeHash    String    @map("code_hash") @db.VarChar(64)
+  expiresAt   DateTime  @map("expires_at")
+  attempts    Int       @default(0)
+  consumedAt  DateTime? @map("consumed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, consumedAt, expiresAt])
+}
+
+model CustomerFeedback {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  name       String   @db.VarChar(160)
+  email      String   @db.VarChar(320)
+  subject    String   @db.VarChar(160)
+  message    String
+  rating     Int?
+  isResolved Boolean  @default(false) @map("is_resolved")
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([isResolved, createdAt])
 }
 
 model Role {

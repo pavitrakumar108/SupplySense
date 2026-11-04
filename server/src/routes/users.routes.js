@@ -1,8 +1,11 @@
 import bcrypt from 'bcryptjs';
+import { createHmac, randomInt } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
+import { env } from '../config/env.js';
 import { authenticate, requireRoles } from '../middleware/auth.js';
 import { writeAudit } from '../services/audit.service.js';
+import { sendVerificationCode } from '../services/email.service.js';
 import { publicUserSelect, serializeUser } from '../services/user.service.js';
 import { AppError } from '../utils/app-error.js';
 import { asyncHandler } from '../utils/async-handler.js';
@@ -39,6 +42,10 @@ const warehousesRequest = z.object({
 });
 const listUsersRequest = z.object({ query: z.object({ page: z.string().optional(), pageSize: z.string().optional(), search: z.string().trim().max(100).optional() }) });
 
+function verificationCodeHash(userId, code) {
+  return createHmac('sha256', env.OTP_SECRET).update(`${userId}:${code}`).digest('hex');
+}
+
 export function createUsersRouter({ db }) {
   const router = Router();
   router.use(authenticate({ db }), requireRoles({ db, roles: ['ADMIN'] }));
@@ -66,7 +73,12 @@ export function createUsersRouter({ db }) {
 
     const user = await db.$transaction(async (tx) => {
       const createdUser = await tx.user.create({
-        data: { email, fullName, passwordHash: await bcrypt.hash(password, 12) },
+        data: {
+          email,
+          fullName,
+          passwordHash: await bcrypt.hash(password, 12),
+          ...(roleCodes.includes('CUSTOMER') ? { emailVerifiedAt: null } : {}),
+        },
       });
       for (const code of roleCodes) {
         const role = await tx.role.upsert({
@@ -87,8 +99,21 @@ export function createUsersRouter({ db }) {
       }
       return tx.user.findUnique({ where: { id: createdUser.id }, select: publicUserSelect });
     });
+    let deliveryMode;
+    if (roleCodes.includes('CUSTOMER')) {
+      const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+      await db.emailVerification.create({
+        data: {
+          userId: user.id,
+          codeHash: verificationCodeHash(user.id, code),
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        },
+      });
+      const delivery = await sendVerificationCode({ email: user.email, code });
+      deliveryMode = delivery.deliveryMode;
+    }
     await writeAudit(db, { actorId: request.user.id, action: 'USER_CREATED', resourceType: 'USER', resourceId: user.id, correlationId: request.id, metadata: { roleCodes } });
-    return createdResponse(request, response, serializeUser(user));
+    return createdResponse(request, response, { ...serializeUser(user), ...(deliveryMode ? { deliveryMode } : {}) });
   }));
 
   router.patch('/:userId', validate(updateUserRequest), asyncHandler(async (request, response) => {
@@ -96,6 +121,52 @@ export function createUsersRouter({ db }) {
     const user = await db.user.update({ where: { id: userId }, data: request.validated.body, select: publicUserSelect });
     await writeAudit(db, { actorId: request.user.id, action: 'USER_UPDATED', resourceType: 'USER', resourceId: user.id, correlationId: request.id, metadata: { fields: Object.keys(request.validated.body) } });
     return successResponse(request, response, serializeUser(user));
+  }));
+
+  router.post('/:userId/discard', validate(userIdParams), asyncHandler(async (request, response) => {
+    const { userId } = request.validated.params;
+    if (userId === request.user.id) throw new AppError('You cannot discard your own admin account.', { statusCode: 400, code: 'CANNOT_DISCARD_SELF' });
+    const now = new Date();
+    const user = await db.$transaction(async (tx) => {
+      const existing = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { id: true } });
+      await tx.refreshToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: now } });
+      await tx.emailVerification.updateMany({ where: { userId, consumedAt: null }, data: { consumedAt: now } });
+      return tx.user.update({ where: { id: existing.id }, data: { isActive: false }, select: publicUserSelect });
+    });
+    await writeAudit(db, { actorId: request.user.id, action: 'USER_DISCARDED', resourceType: 'USER', resourceId: user.id, correlationId: request.id });
+    return successResponse(request, response, serializeUser(user));
+  }));
+
+  router.post('/:userId/require-verification', validate(userIdParams), asyncHandler(async (request, response) => {
+    const { userId } = request.validated.params;
+    if (userId === request.user.id) throw new AppError('You cannot require re-verification for your own admin account.', { statusCode: 400, code: 'CANNOT_REVERIFY_SELF' });
+    const existing = await db.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, roles: { select: { role: { select: { code: true } } } } },
+    });
+    if (!existing) throw new AppError('User not found.', { statusCode: 404, code: 'USER_NOT_FOUND' });
+    if (!existing.roles.some(({ role }) => role.code === 'CUSTOMER')) {
+      throw new AppError('Email re-verification can only be required for customer accounts.', { statusCode: 422, code: 'CUSTOMER_ACCOUNT_REQUIRED' });
+    }
+
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    const now = new Date();
+    await db.$transaction(async (tx) => {
+      await tx.refreshToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: now } });
+      await tx.emailVerification.updateMany({ where: { userId, consumedAt: null }, data: { consumedAt: now } });
+      await tx.emailVerification.create({
+        data: {
+          userId,
+          codeHash: verificationCodeHash(userId, code),
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        },
+      });
+      await tx.user.update({ where: { id: userId }, data: { isActive: true, emailVerifiedAt: null } });
+    });
+
+    const delivery = await sendVerificationCode({ email: existing.email, code });
+    await writeAudit(db, { actorId: request.user.id, action: 'USER_REVERIFICATION_REQUESTED', resourceType: 'USER', resourceId: userId, correlationId: request.id });
+    return successResponse(request, response, { email: existing.email, verificationRequired: true, deliveryMode: delivery.deliveryMode });
   }));
 
   router.patch('/:userId/roles', validate(rolesRequest), asyncHandler(async (request, response) => {

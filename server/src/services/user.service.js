@@ -6,6 +6,7 @@ export const publicUserSelect = {
   fullName: true,
   isActive: true,
   createdAt: true,
+  emailVerifiedAt: true,
   roles: { select: { role: { select: { code: true, name: true } } } },
 };
 
@@ -16,6 +17,7 @@ export function serializeUser(user) {
     fullName: user.fullName,
     isActive: user.isActive,
     createdAt: user.createdAt,
+    emailVerifiedAt: user.emailVerifiedAt,
     roles: user.roles.map(({ role }) => ({ code: role.code, name: role.name })),
   };
 }
